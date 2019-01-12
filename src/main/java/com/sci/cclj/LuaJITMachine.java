@@ -8,15 +8,16 @@ public final class LuaJITMachine {
         try {
             final String libraryExtension;
 
-            final String os = System.getProperty("os.name").toLowerCase();
-            if(os.contains("win")) {
-                throw new RuntimeException("Windows is currently not supported");
-            } else if(os.contains("mac")) {
-                throw new RuntimeException("OSX is currently not supported");
-            } else if(os.contains("nux") || os.contains("nix") || os.contains("aix")) {
-                libraryExtension = "so";
-            } else {
-                throw new RuntimeException("Unknown operating system: '" + os + "'");
+            switch(OS.check()) {
+                case WINDOWS:
+                    throw new RuntimeException("Windows is currently not supported");
+                case OSX:
+                    throw new RuntimeException("OSX is currently not supported");
+                case LINUX:
+                    libraryExtension = "so";
+                    break;
+                default:
+                    throw new RuntimeException(String.format("Unknown operating system: '%s'", System.getProperty("os.name")));
             }
 
             final File modsDirectory = new File(LuaJITMachine.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile();
