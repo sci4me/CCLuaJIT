@@ -14,7 +14,7 @@ public final class CCLuaJIT implements IFMLLoadingPlugin {
 
     @Override
     public String getModContainerClass() {
-        return null;
+        return CCLuaJITModContainer.class.getCanonicalName();
     }
 
     @Override
@@ -24,7 +24,7 @@ public final class CCLuaJIT implements IFMLLoadingPlugin {
 
     @Override
     public void injectData(final Map<String, Object> data) {
-        for(int i = 0; i < 10000; i++) System.out.println("HELLo, COREMOD");
+
     }
 
     @Override
