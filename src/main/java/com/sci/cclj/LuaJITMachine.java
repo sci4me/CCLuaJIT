@@ -22,9 +22,22 @@ public final class LuaJITMachine {
         System.load(library.getPath());
     }
 
+    private long luaState;
+
     public LuaJITMachine() {
-        System.out.println(this.test());
+        if(!this.createLuaState()) {
+            throw new RuntimeException("Failed to create native Lua state");
+        }
     }
 
-    private native String test();
+    private native boolean createLuaState();
+
+    private native void destroyLuaState();
+
+    @Override
+    public void finalize() {
+        synchronized(this) {
+            if(this.luaState != 0) this.destroyLuaState();
+        }
+    }
 }
