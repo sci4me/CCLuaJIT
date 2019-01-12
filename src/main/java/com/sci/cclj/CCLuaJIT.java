@@ -24,7 +24,7 @@ public final class CCLuaJIT implements IFMLLoadingPlugin {
 
     @Override
     public void injectData(final Map<String, Object> data) {
-
+        new LuaJITMachine();
     }
 
     @Override
