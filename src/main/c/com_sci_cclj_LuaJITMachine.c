@@ -1,14 +1,14 @@
 #include <jni.h>
 
+extern "C" {
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+}
 
 #define CCLJ_JNIVERSION JNI_VERSION_1_6
 
 static void sysout(JNIEnv *env, const char *str);
-
-static jclass get_class(JNIEnv *env, const char *name);
 
 static lua_State* get_lua_state(JNIEnv *env, jobject obj);
 static void set_lua_state(JNIEnv *env, jobject obj, lua_State *L);
@@ -19,12 +19,12 @@ static int initialized = 0;
 
 JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
 	JNIEnv *env;
-	if ((*vm)->GetEnv(vm, (void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
+	if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
 		return CCLJ_JNIVERSION;
 	}
 
-    if(!(machine_class = get_class(env, "com/sci/cclj/LuaJITMachine")) ||
-        !(lua_state_id = (*env)->GetFieldID(env, machine_class, "luaState", "J"))) {
+    if(!(machine_class = env->FindClass("com/sci/cclj/LuaJITMachine")) ||
+        !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -34,12 +34,12 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
 
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNIEnv *env;
-    if ((*vm)->GetEnv(vm, (void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
+    if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
         return;
     }
 
     if(machine_class) {
-        (*env)->DeleteGlobalRef(env, machine_class);
+        env->DeleteGlobalRef(machine_class);
     }
 }
 
@@ -48,6 +48,11 @@ JNIEXPORT jboolean JNICALL Java_com_sci_cclj_LuaJITMachine_createLuaState(JNIEnv
 
     lua_State *L = luaL_newstate();
     if(!L) return 0;
+
+    luaopen_base(L);
+    luaopen_table(L);
+    luaopen_string(L);
+    luaopen_math(L);
 
     set_lua_state(env, obj, L);
 
@@ -67,27 +72,19 @@ JNIEXPORT void JNICALL Java_com_sci_cclj_LuaJITMachine_destroyLuaState(JNIEnv *e
 }
 
 static void sysout(JNIEnv *env, const char *str) {
-    jclass system = (*env)->FindClass(env, "java/lang/System");
-    jfieldID outID = (*env)->GetStaticFieldID(env, system, "out", "Ljava/io/PrintStream;");
-    jobject out = (*env)->GetStaticObjectField(env, system, outID);
-    jclass printStream = (*env)->FindClass(env, "java/io/PrintStream");
-    jmethodID printlnID = (*env)->GetMethodID(env, printStream, "println", "(Ljava/lang/String;)V");
-    jstring jstr = (*env)->NewStringUTF(env, str);
-    (*env)->CallVoidMethod(env, out, printlnID, jstr);
-}
-
-static jclass get_class(JNIEnv *env, const char *name) {
-    jclass clazz = (*env)->FindClass(env, name);
-    if(!clazz) {
-        return 0;
-    }
-    return (*env)->NewGlobalRef(env, clazz);
+    jclass system = env->FindClass("java/lang/System");
+    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
+    jobject out = env->GetStaticObjectField(system, outID);
+    jclass printStream = env->FindClass("java/io/PrintStream");
+    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
+    jstring jstr = env->NewStringUTF(str);
+    env->CallVoidMethod(out, printlnID, jstr);
 }
 
 lua_State *get_lua_state(JNIEnv *env, jobject obj) {
-    return (lua_State*) (*env)->GetLongField(env, obj, lua_state_id);
+    return (lua_State*) env->GetLongField(obj, lua_state_id);
 }
 
 void set_lua_state(JNIEnv *env, jobject obj, lua_State *L) {
-    (*env)->SetLongField(env, obj, lua_state_id, (jlong) L);
+    env->SetLongField(obj, lua_state_id, (jlong) L);
 }
