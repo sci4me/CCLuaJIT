@@ -6,6 +6,7 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.util.Arrays;
 import java.util.Optional;
 
 public final class LuaJITMachineTransformer implements IClassTransformer {
@@ -28,9 +29,44 @@ public final class LuaJITMachineTransformer implements IClassTransformer {
             final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             cn.accept(cw);
             return cw.toByteArray();
+        } else if(name.equals("dan200.computercraft.core.filesystem.JarMount$FileInZip")) {
+            final ClassNode cn = new ClassNode();
+            final ClassReader cr = new ClassReader(basicClass);
+            cr.accept(cn, 0);
+
+            this.transformCreateResourceMountDebug(cn);
+
+            final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            cn.accept(cw);
+            return cw.toByteArray();
         } else {
             return basicClass;
         }
+    }
+
+    private void transformCreateResourceMountDebug(final ClassNode cn) {
+        final MethodNode mn = cn.methods
+                .stream()
+                .filter(m -> m.name.equals("getParent"))
+                .findFirst()
+                .get();
+
+        final AbstractInsnNode cl = Arrays.stream(mn.instructions.toArray())
+                .filter(i -> i instanceof MethodInsnNode && ((MethodInsnNode) i).name.equals("getFile"))
+                .findFirst()
+                .get();
+
+
+        final InsnList list = new InsnList();
+
+        final LabelNode label = new LabelNode();
+        list.add(new InsnNode(Opcodes.DUP));
+        list.add(new JumpInsnNode(Opcodes.IFNONNULL, label));
+        list.add(new InsnNode(Opcodes.ACONST_NULL));
+        list.add(new InsnNode(Opcodes.ARETURN));
+        list.add(label);
+
+        mn.instructions.insert(cl, list);
     }
 
     private void transformComputer(final ClassNode cn) {

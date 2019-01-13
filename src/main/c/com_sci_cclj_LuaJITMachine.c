@@ -17,6 +17,10 @@ static jclass machine_class = 0;
 static jfieldID lua_state_id = 0;
 static int initialized = 0;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
 	JNIEnv *env;
 	if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
@@ -70,6 +74,10 @@ JNIEXPORT void JNICALL Java_com_sci_cclj_LuaJITMachine_destroyLuaState(JNIEnv *e
 
     sysout(env, "CLOSED LUA STATE");
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 static void sysout(JNIEnv *env, const char *str) {
     jclass system = env->FindClass("java/lang/System");
