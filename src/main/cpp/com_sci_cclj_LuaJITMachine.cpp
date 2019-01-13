@@ -38,8 +38,10 @@ static jclass object_class = 0;
 
 static jclass number_class = 0;
 static jmethodID doublevalue_id = 0;
+static jmethodID intvalue_id = 0;
 
 static jclass integer_class = 0;
+static jmethodID integer_valueof_id = 0;
 
 static jclass double_class = 0;
 static jmethodID double_valueof_id = 0;
@@ -54,6 +56,24 @@ static jclass string_class = 0;
 static jclass bytearray_class = 0;
 
 static jclass map_class = 0;
+static jmethodID map_containskey_id = 0;
+static jmethodID map_get_id = 0;
+static jmethodID map_put_id = 0;
+static jmethodID map_entryset_id = 0;
+
+static jclass map_entry_class = 0;
+static jmethodID map_entry_getkey_id = 0;
+static jmethodID map_entry_getvalue_id = 0;
+
+static jclass hashmap_class = 0;
+static jmethodID hashmap_init_id = 0;
+
+static jclass set_class = 0;
+static jmethodID set_iterator_id = 0;
+
+static jclass iterator_class = 0;
+static jmethodID iterator_hasnext_id = 0;
+static jmethodID iterator_next_id = 0;
 
 static jclass identityhashmap_class = 0;
 static jmethodID identityhashmap_init_id = 0;
@@ -76,7 +96,7 @@ static int initialized = 0;
 extern "C" {
 #endif
 
-static void dump_stack(JNIEnv *env, lua_State *L) {
+static void dump_stack(lua_State *L) {
     sysout("stack: [");
 
     char buf[32];
@@ -123,11 +143,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
     }
 
     if(!(number_class = get_class_global_ref(env, "java/lang/Number")) ||
-        !(doublevalue_id = env->GetMethodID(number_class, "doubleValue", "()D"))) {
+        !(doublevalue_id = env->GetMethodID(number_class, "doubleValue", "()D")) ||
+        !(intvalue_id = env->GetMethodID(number_class, "intValue", "()I"))) {
         return CCLJ_JNIVERSION;
     }
 
-    if(!(integer_class = get_class_global_ref(env, "java/lang/Integer"))) {
+    if(!(integer_class = get_class_global_ref(env, "java/lang/Integer")) ||
+        !(integer_valueof_id = env->GetStaticMethodID(integer_class, "valueOf", "(I)Ljava/lang/Integer;"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -151,7 +173,33 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
-    if(!(map_class = get_class_global_ref(env, "java/util/Map"))) {
+    if(!(map_class = get_class_global_ref(env, "java/util/Map")) ||
+        !(map_containskey_id = env->GetMethodID(map_class, "containsKey", "(Ljava/lang/Object;)Z")) ||
+        !(map_get_id = env->GetMethodID(map_class, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")) ||
+        !(map_put_id = env->GetMethodID(map_class, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")) ||
+        !(map_entryset_id = env->GetMethodID(map_class, "entrySet", "()Ljava/util/Set;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(map_entry_class = get_class_global_ref(env, "java/util/Map$Entry")) ||
+        !(map_entry_getkey_id = env->GetMethodID(map_entry_class, "getKey", "()Ljava/lang/Object;")) ||
+        !(map_entry_getvalue_id = env->GetMethodID(map_entry_class, "getValue", "()Ljava/lang/Object;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(hashmap_class = get_class_global_ref(env, "java/util/HashMap")) ||
+        !(hashmap_init_id = env->GetMethodID(hashmap_class, "<init>", "()V"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(set_class = get_class_global_ref(env, "java/util/Set")) ||
+        !(set_iterator_id = env->GetMethodID(set_class, "iterator", "()Ljava/util/Iterator;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(iterator_class = get_class_global_ref(env, "java/util/Iterator")) ||
+        !(iterator_hasnext_id = env->GetMethodID(iterator_class, "hasNext", "()Z")) ||
+        !(iterator_next_id = env->GetMethodID(iterator_class, "next", "()Ljava/lang/Object;"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -196,6 +244,9 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(string_class)            env->DeleteGlobalRef(string_class);
     if(bytearray_class)         env->DeleteGlobalRef(bytearray_class);
     if(map_class)               env->DeleteGlobalRef(map_class);
+    if(hashmap_class)           env->DeleteGlobalRef(hashmap_class);
+    if(set_class)               env->DeleteGlobalRef(set_class);
+    if(iterator_class)          env->DeleteGlobalRef(iterator_class);
     if(identityhashmap_class)   env->DeleteGlobalRef(identityhashmap_class);
     if(machine_class)           env->DeleteGlobalRef(machine_class);
     if(iluaapi_class)           env->DeleteGlobalRef(iluaapi_class);
@@ -233,20 +284,20 @@ CCLJ_JNIEXPORT(void, destroyLuaState) {
 CCLJ_JNIEXPORT(jboolean, registerAPI, jobject api) {
     lua_State *L = get_lua_state(env, obj);
 
-    int i = wrap_lua_object(env, L, api);    
+    int table = wrap_lua_object(env, L, api);    
 
     jobjectArray names = (jobjectArray) env->CallObjectMethod(api, get_names_id);
     jsize len = env->GetArrayLength(names);
     for(jsize i = 0; i < len; i++) {
         jstring name = (jstring) env->GetObjectArrayElement(names, i);
         const char *namec = env->GetStringUTFChars(name, JNI_FALSE);
-        lua_pushvalue(L, i);
+        lua_pushvalue(L, table);
         lua_setglobal(L, namec);
         env->ReleaseStringUTFChars(name, namec);
         env->DeleteLocalRef(name);
     }
 
-    lua_remove(L, i);
+    lua_remove(L, table);
 
     return 1;
 }
@@ -300,9 +351,30 @@ CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
 #endif
 
 static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress) {
-    sysout("MAP_TO_TABLE!!!");
-    sysout("MAP_TO_TABLE!!!");
-    sysout("MAP_TO_TABLE!!!");
+    if(env->CallBooleanMethod(valuesInProgress, map_containskey_id, map)) {
+        jobject bidx = env->CallObjectMethod(valuesInProgress, map_get_id, map);
+        jint idx = env->CallStaticIntMethod(integer_class, intvalue_id, bidx);
+        lua_pushvalue(L, idx);
+        return;
+    }
+
+    lua_newtable(L);
+    int idx = lua_gettop(L);
+
+    env->CallObjectMethod(valuesInProgress, map_put_id, map, env->CallStaticObjectMethod(integer_class, integer_valueof_id, idx));
+
+    jobject entrySet = env->CallObjectMethod(map, map_entryset_id);
+    jobject iterator = env->CallObjectMethod(entrySet, set_iterator_id);
+
+    while(env->CallBooleanMethod(iterator, iterator_hasnext_id)) {
+        jobject next = env->CallObjectMethod(iterator, iterator_next_id);
+        jobject key = env->CallObjectMethod(next, map_entry_getkey_id);
+        jobject value = env->CallObjectMethod(next, map_entry_getvalue_id);
+
+        to_lua_value(env, L, key);
+        to_lua_value(env, L, value);
+        lua_settable(L, idx);
+    }
 }
 
 static void map_to_table(JNIEnv *env, lua_State *L, jobject map) {
@@ -413,7 +485,7 @@ static jobject to_java_value(JNIEnv *env, lua_State *L) {
 static jobjectArray to_java_values(JNIEnv *env, lua_State *L, int n) {
     jobjectArray result = env->NewObjectArray(n, object_class, 0);
     for(int i = n; i > 0; i--) {
-        env->SetObjectArrayElement(result, i, to_java_value(env, L));
+        env->SetObjectArrayElement(result, i - 1, to_java_value(env, L));
     }
     return result;
 }
@@ -430,8 +502,23 @@ static JavaFN* check_java_fn(lua_State *L) {
 }
 
 static int invoke_java_fn(lua_State *L) {
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        luaL_error(L, "JavaFN invocation wrapper could not retrieve JNIEnv");
+        return 0;
+    }
 
-    return 0;
+    JavaFN *jfn = (JavaFN*) lua_touserdata(L, lua_upvalueindex(1));
+
+    jobjectArray arguments = to_java_values(env, L, lua_gettop(L));
+    jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, 0, jfn->index, arguments);
+
+    if(results) {
+        to_lua_values(env, L, results);
+        return env->GetArrayLength(results);
+    } else {
+        return 0;
+    }
 }
 
 static int finalize_java_fn(lua_State *L) {

@@ -46,7 +46,7 @@ task buildDynamicLibrary(type: Exec) {
     } else {
         commandLine "make"
     }
-    workingDir "src/main/c"
+    workingDir "src/main/cpp"
 }
 
 build.dependsOn buildDynamicLibrary
