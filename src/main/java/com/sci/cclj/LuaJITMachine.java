@@ -3,9 +3,7 @@ package com.sci.cclj;
 import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.lua.ILuaMachine;
 
-import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 
 public final class LuaJITMachine implements ILuaMachine {
     static {
@@ -35,9 +33,6 @@ public final class LuaJITMachine implements ILuaMachine {
     public LuaJITMachine(final IComputer computer) {
         this.computer = computer;
 
-        this.computer.queueEvent("dummy", new Object[0]);
-        System.out.println("LuaJITMachine has been created!");
-
         if(!this.createLuaState()) {
             throw new RuntimeException("Failed to create native Lua state");
         }
@@ -46,6 +41,10 @@ public final class LuaJITMachine implements ILuaMachine {
     private native boolean createLuaState();
 
     private native void destroyLuaState();
+
+    private native boolean registerAPI(final ILuaAPI api);
+
+    private native boolean loadBios(final String bios);
 
     @Override
     public void finalize() {
@@ -56,27 +55,49 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public void addAPI(final ILuaAPI api) {
+        System.out.println("addAPI " + api);
 
+        if(!this.registerAPI(api)) {
+            throw new RuntimeException("Failed to register API " + api);
+        }
     }
 
     @Override
     public void loadBios(final InputStream bios) {
+        if(this.mainRoutine != 0) return;
 
+        try {
+            final StringBuilder sb = new StringBuilder();
+            final BufferedReader reader = new BufferedReader(new InputStreamReader(bios));
+            String line;
+            while((line = reader.readLine()) != null) {
+                sb.append(line);
+                sb.append('\n');
+            }
+
+            if(!this.loadBios(sb.toString())) {
+                throw new RuntimeException("Failed to create main routine");
+            }
+        } catch(final IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void handleEvent(final String eventName, final Object[] arguments) {
-
+        System.out.print("handleEvent " + eventName);
+        if(arguments != null) System.out.print(" " + arguments.length);
+        System.out.println();
     }
 
     @Override
     public void softAbort(final String abortMessage) {
-
+        System.out.println("softAbort");
     }
 
     @Override
     public void hardAbort(final String abortMessage) {
-
+        System.out.println("hardAbort");
     }
 
     @Override
@@ -96,6 +117,6 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public void unload() {
-
+        System.out.println("unload");
     }
 }
