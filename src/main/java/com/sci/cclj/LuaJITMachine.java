@@ -92,40 +92,36 @@ public final class LuaJITMachine implements ILuaMachine {
         if(this.mainRoutine == 0) return;
         if(this.eventFilter != null && eventName != null && !eventName.equals(this.eventFilter) && !eventName.equals("terminate")) return;
 
-        try {
-            final Object[] resumeArgs;
-            if(eventName == null) {
-                resumeArgs = new Object[0];
-            } else {
-                resumeArgs = new Object[arguments.length + 1];
-                resumeArgs[0] = eventName;
-                System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
-            }
-
-            for(final Object arg : resumeArgs) System.out.println(arg + " " + arg.getClass());
-
-            final Object[] results = this.resumeMainRoutine(resumeArgs);
-
-            for(final Object result : results) System.out.println(result);
-
-            if(this.hardAbortMessage != null) {
-                throw new LuaError(this.hardAbortMessage);
-            } else if(results.length > 0 && results[0] instanceof Boolean && ((Boolean) results[0]).booleanValue() == false) {
-                throw new LuaError((String) results[1]);
-            } else {
-                final Object filter = results[1];
-                if(filter instanceof String) {
-                    this.eventFilter = (String) filter;
-                } else {
-                    this.eventFilter = null;
-                }
-            }
-        } catch(final LuaError e) {
-            this.destroyLuaState();
-        } finally {
-            this.softAbortMessage = null;
-            this.hardAbortMessage = null;
+        final Object[] resumeArgs;
+        if(eventName == null) {
+            resumeArgs = new Object[0];
+        } else {
+            resumeArgs = new Object[arguments.length + 1];
+            resumeArgs[0] = eventName;
+            System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
         }
+
+        for(final Object arg : resumeArgs) System.out.println(arg + " " + arg.getClass());
+
+        final Object[] results = this.resumeMainRoutine(resumeArgs);
+
+        for(final Object result : results) System.out.println(result);
+
+        if(this.hardAbortMessage != null) {
+            this.destroyLuaState();
+        } else if (results.length > 0 && results[0] instanceof Boolean && ((Boolean) results[0]).booleanValue() == false) {
+            this.destroyLuaState();
+        } else {
+            final Object filter = results[1];
+            if(filter instanceof String) {
+                this.eventFilter = (String) filter;
+            } else {
+                this.eventFilter = null;
+            }
+        }
+
+        this.softAbortMessage = null;
+        this.hardAbortMessage = null;
     }
 
     @Override
@@ -150,7 +146,7 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public boolean isFinished() {
-        return false;
+        return this.mainRoutine == 0;
     }
 
     @Override
