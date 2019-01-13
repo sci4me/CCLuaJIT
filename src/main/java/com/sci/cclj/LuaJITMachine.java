@@ -102,7 +102,11 @@ public final class LuaJITMachine implements ILuaMachine {
                 System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
             }
 
+            for(final Object arg : resumeArgs) System.out.println(arg + " " + arg.getClass());
+
             final Object[] results = this.resumeMainRoutine(resumeArgs);
+
+            for(final Object result : results) System.out.println(result);
 
             if(this.hardAbortMessage != null) {
                 throw new LuaError(this.hardAbortMessage);
