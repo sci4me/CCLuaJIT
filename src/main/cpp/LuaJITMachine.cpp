@@ -82,6 +82,9 @@ static jclass machine_class = 0;
 static jfieldID lua_state_id = 0;
 static jfieldID main_routine_id = 0;
 
+static jclass luacontext_class = 0;
+static jmethodID luacontext_init_id = 0;
+
 static jclass iluaobject_class = 0;
 static jmethodID get_method_names_id = 0;
 static jmethodID call_method_id = 0;
@@ -214,6 +217,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
+    if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/LuaContext")) ||
+        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "()V"))) {
+        return CCLJ_JNIVERSION;
+    }
+
     if(!(iluaapi_class = get_class_global_ref(env, "dan200/computercraft/core/apis/ILuaAPI")) ||
         !(get_names_id = env->GetMethodID(iluaapi_class, "getNames", "()[Ljava/lang/String;"))) {
         return CCLJ_JNIVERSION;
@@ -249,6 +257,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(iterator_class)          env->DeleteGlobalRef(iterator_class);
     if(identityhashmap_class)   env->DeleteGlobalRef(identityhashmap_class);
     if(machine_class)           env->DeleteGlobalRef(machine_class);
+    if(luacontext_class)        env->DeleteGlobalRef(luacontext_class);
     if(iluaapi_class)           env->DeleteGlobalRef(iluaapi_class);
     if(iluaobject_class)        env->DeleteGlobalRef(iluaobject_class); 
 }
@@ -321,12 +330,19 @@ CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
 CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
     lua_State *L = get_main_routine(env, obj);
 
-    to_lua_values(env, L, args);
+    dump_stack(L);
 
-    jsize alen = env->GetArrayLength(args);
-    int before = lua_gettop(L) + alen;
-    int stat = lua_resume(L, alen);
+    int nargs = env->GetArrayLength(args);
+    int before = lua_gettop(L);
+    to_lua_values(env, L, args);
+    int stat = lua_resume(L, nargs);
     int after = lua_gettop(L);
+
+    char buf[256];
+    sprintf(buf, "before: %i | after: %i | nargs: %i", before, after, nargs);
+    sysout(buf);
+
+    dump_stack(L);
 
     jobjectArray results;
 
@@ -337,6 +353,11 @@ CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
         } else {
             results = env->NewObjectArray(0, object_class, 0);
         }
+
+        // @TODO ?
+        // if(stat == 0) {
+        //     Java_com_sci_cclj_LuaJITMachine_destroyLuaState(env, obj);
+        // }
     } else {
         results = env->NewObjectArray(2, object_class, 0);
         env->SetObjectArrayElement(results, 0, boolean_false);
@@ -510,8 +531,10 @@ static int invoke_java_fn(lua_State *L) {
 
     JavaFN *jfn = (JavaFN*) lua_touserdata(L, lua_upvalueindex(1));
 
+    jobject luaContext = env->NewObject(luacontext_class, luacontext_init_id);
+
     jobjectArray arguments = to_java_values(env, L, lua_gettop(L));
-    jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, 0, jfn->index, arguments);
+    jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, luaContext, jfn->index, arguments);
 
     if(results) {
         to_lua_values(env, L, results);

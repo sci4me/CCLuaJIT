@@ -101,17 +101,16 @@ public final class LuaJITMachine implements ILuaMachine {
             System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
         }
 
-        for(final Object arg : resumeArgs) System.out.println(arg + " " + arg.getClass());
-
         final Object[] results = this.resumeMainRoutine(resumeArgs);
-
-        for(final Object result : results) System.out.println(result);
 
         if(this.hardAbortMessage != null) {
             this.destroyLuaState();
         } else if (results.length > 0 && results[0] instanceof Boolean && ((Boolean) results[0]).booleanValue() == false) {
             this.destroyLuaState();
         } else {
+            for(final Object obj : results) System.out.print(obj + " ");
+            System.out.println();
+
             final Object filter = results[1];
             if(filter instanceof String) {
                 this.eventFilter = (String) filter;
@@ -126,12 +125,13 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public void softAbort(final String abortMessage) {
-        System.out.println("softAbort");
+        this.softAbortMessage = abortMessage;
     }
 
     @Override
     public void hardAbort(final String abortMessage) {
-        System.out.println("hardAbort");
+        this.softAbortMessage = abortMessage;
+        this.hardAbortMessage = abortMessage;
     }
 
     @Override
@@ -151,6 +151,6 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public void unload() {
-        System.out.println("unload");
+        if(this.mainRoutine != 0) this.destroyLuaState();
     }
 }
