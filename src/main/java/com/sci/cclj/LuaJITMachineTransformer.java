@@ -6,7 +6,6 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
-import java.util.Arrays;
 import java.util.Optional;
 
 public final class LuaJITMachineTransformer implements IClassTransformer {
