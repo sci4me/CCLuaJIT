@@ -30,6 +30,10 @@ public final class LuaJITMachine implements ILuaMachine {
     private long luaState;
     private long mainRoutine;
 
+    private String eventFilter;
+    private String hardAbortMessage;
+    private String softAbortMessage;
+
     public LuaJITMachine(final IComputer computer) {
         this.computer = computer;
 
@@ -46,6 +50,8 @@ public final class LuaJITMachine implements ILuaMachine {
 
     private native boolean loadBios(final String bios);
 
+    private native Object[] resumeMainRoutine(final Object[] arguments);
+
     @Override
     public void finalize() {
         synchronized(this) {
@@ -55,8 +61,6 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public void addAPI(final ILuaAPI api) {
-        System.out.println("addAPI " + api);
-
         if(!this.registerAPI(api)) {
             throw new RuntimeException("Failed to register API " + api);
         }
@@ -85,9 +89,39 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public void handleEvent(final String eventName, final Object[] arguments) {
-        System.out.print("handleEvent " + eventName);
-        if(arguments != null) System.out.print(" " + arguments.length);
-        System.out.println();
+        if(this.mainRoutine == 0) return;
+        if(this.eventFilter != null && eventName != null && !eventName.equals(this.eventFilter) && !eventName.equals("terminate")) return;
+
+        try {
+            final Object[] resumeArgs;
+            if(eventName == null) {
+                resumeArgs = new Object[0];
+            } else {
+                resumeArgs = new Object[arguments.length + 1];
+                resumeArgs[0] = eventName;
+                System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
+            }
+
+            final Object[] results = this.resumeMainRoutine(resumeArgs);
+
+            if(this.hardAbortMessage != null) {
+                throw new LuaError(this.hardAbortMessage);
+            } else if(results.length > 0 && results[0] instanceof Boolean && ((Boolean) results[0]).booleanValue() == false) {
+                throw new LuaError((String) results[1]);
+            } else {
+                final Object filter = results[1];
+                if(filter instanceof String) {
+                    this.eventFilter = (String) filter;
+                } else {
+                    this.eventFilter = null;
+                }
+            }
+        } catch(final LuaError e) {
+            this.destroyLuaState();
+        } finally {
+            this.softAbortMessage = null;
+            this.hardAbortMessage = null;
+        }
     }
 
     @Override

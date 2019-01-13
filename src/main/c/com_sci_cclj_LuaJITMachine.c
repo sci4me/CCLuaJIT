@@ -12,20 +12,29 @@ extern "C" {
 
 #define CCLJ_JNIEXPORT(rtype, name, ...) JNIEXPORT rtype JNICALL Java_com_sci_cclj_LuaJITMachine_##name(JNIEnv *env, jobject obj, ##__VA_ARGS__)
 
-static void sysout(JNIEnv *env, const char *str);
+static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj);
 
 static lua_State* get_lua_state(JNIEnv *env, jobject obj);
 static void set_lua_state(JNIEnv *env, jobject obj, lua_State *L);
 static lua_State* get_main_routine(JNIEnv *env, jobject obj);
 static void set_main_routine(JNIEnv *env, jobject obj, lua_State *L);
 
+static void sysout(JNIEnv *env, const char *str);
+
+static jclass object_class = 0;
+
 static jclass machine_class = 0;
 static jfieldID lua_state_id = 0;
 static jfieldID main_routine_id = 0;
 
+static jclass iluaobject_class = 0;
+static jmethodID get_method_names_id = 0;
+static jmethodID call_method_id = 0;
+
 static jclass iluaapi_class = 0;
 static jmethodID get_names_id = 0;
 
+static JavaVM *jvm;
 static int initialized = 0;
 
 #ifdef __cplusplus
@@ -61,10 +70,16 @@ static void dump_stack(JNIEnv *env, lua_State *L) {
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
+    jvm = vm;
+
 	JNIEnv *env;
 	if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
 		return CCLJ_JNIVERSION;
 	}
+
+    if(!(object_class = env->FindClass("java/lang/Object"))) {
+        return CCLJ_JNIVERSION;
+    }
 
     if(!(machine_class = env->FindClass("com/sci/cclj/LuaJITMachine")) ||
         !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J")) ||
@@ -74,6 +89,12 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
 
     if(!(iluaapi_class = env->FindClass("dan200/computercraft/core/apis/ILuaAPI")) ||
         !(get_names_id = env->GetMethodID(iluaapi_class, "getNames", "()[Ljava/lang/String;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(iluaobject_class = env->FindClass("dan200/computercraft/api/lua/ILuaObject")) ||
+        !(get_method_names_id = env->GetMethodID(iluaobject_class, "getMethodNames", "()[Ljava/lang/String;")) ||
+        !(call_method_id = env->GetMethodID(iluaobject_class, "callMethod", "(Ldan200/computercraft/api/lua/ILuaContext;I[Ljava/lang/Object;)[Ljava/lang/Object;"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -122,15 +143,22 @@ CCLJ_JNIEXPORT(void, destroyLuaState) {
 CCLJ_JNIEXPORT(jboolean, registerAPI, jobject api) {
     lua_State *L = get_lua_state(env, obj);
 
+    int i = wrap_lua_object(env, L, api);    
+
     jobjectArray names = (jobjectArray) env->CallObjectMethod(api, get_names_id);
     jsize len = env->GetArrayLength(names);
     for(jsize i = 0; i < len; i++) {
         jstring name = (jstring) env->GetObjectArrayElement(names, i);
-
-        // @TODO
+        const char *namec = env->GetStringUTFChars(name, JNI_FALSE);
+        lua_pushvalue(L, i);
+        lua_setglobal(L, namec);
+        env->ReleaseStringUTFChars(name, namec);
+        env->DeleteLocalRef(name);
     }
 
-    return 0;
+    lua_remove(L, i);
+
+    return 1;
 }
 
 CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
@@ -144,21 +172,88 @@ CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
     env->ReleaseStringUTFChars(bios, biosc);
     if(err) return 0;
 
+    set_main_routine(env, obj, main_routine);
+
     return lua_isthread(L, -1);
+}
+
+CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
+    jobjectArray result = env->NewObjectArray(0, object_class, 0);
+
+
+
+    return result;
 }
 
 #ifdef __cplusplus
 }
 #endif
 
-void sysout(JNIEnv *env, const char *str) {
-    jclass system = env->FindClass("java/lang/System");
-    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
-    jobject out = env->GetStaticObjectField(system, outID);
-    jclass printStream = env->FindClass("java/io/PrintStream");
-    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
-    jstring jstr = env->NewStringUTF(str);
-    env->CallVoidMethod(out, printlnID, jstr);
+typedef struct JavaFN {
+    jobject obj;
+    int index;
+} JavaFN;
+
+static JavaFN* check_java_fn(lua_State *L) {
+    JavaFN *jfn = (JavaFN*) luaL_checkudata(L, 1, "JavaFN");
+    if(!jfn->obj) luaL_error(L, "Attempt to finalize finalized JavaFN");
+    return jfn;
+}
+
+static int invoke_java_fn(lua_State *L) {
+
+    return 0;
+}
+
+static int finalize_java_fn(lua_State *L) {
+    JavaFN *jfn = check_java_fn(L);
+
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        luaL_error(L, "JavaFN finalizer could not retrieve JNIEnv");
+        return 0;
+    }
+
+    env->DeleteGlobalRef(jfn->obj);
+
+    jfn->obj = 0;
+    return 0;
+}
+
+static void new_java_fn(JNIEnv *env, lua_State *L, jobject obj, int index) {
+    JavaFN *jfn = (JavaFN*) lua_newuserdata(L, sizeof(JavaFN));
+    jfn->obj = env->NewGlobalRef(obj);
+    jfn->index = index;
+
+    if(luaL_newmetatable(L, "JavaFN")) {
+        lua_pushstring(L, "__gc");
+        lua_pushcfunction(L, finalize_java_fn);
+        lua_settable(L, -3);
+    }
+
+    lua_setmetatable(L, -2);
+}
+
+static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj) {
+    lua_newtable(L);
+    int table = lua_gettop(L);
+
+    jobjectArray methodNames = (jobjectArray) env->CallObjectMethod(obj, get_method_names_id);
+    jsize len = env->GetArrayLength(methodNames);
+    for(jsize i = 0; i < len; i++) {
+        jstring methodName = (jstring) env->GetObjectArrayElement(methodNames, i);
+        const char *methodNamec = env->GetStringUTFChars(methodName, JNI_FALSE);
+
+        lua_pushstring(L, methodNamec);
+        new_java_fn(env, L, obj, i);
+        lua_pushcclosure(L, invoke_java_fn, 1);
+        lua_settable(L, table);
+
+        env->ReleaseStringUTFChars(methodName, methodNamec);
+        env->DeleteLocalRef(methodName);
+    }
+
+    return lua_gettop(L);
 }
 
 lua_State *get_lua_state(JNIEnv *env, jobject obj) {
@@ -175,4 +270,14 @@ lua_State *get_main_routine(JNIEnv *env, jobject obj) {
 
 void set_main_routine(JNIEnv *env, jobject obj, lua_State *L) {
     env->SetLongField(obj, main_routine_id, (jlong) L);
+}
+
+void sysout(JNIEnv *env, const char *str) {
+    jclass system = env->FindClass("java/lang/System");
+    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
+    jobject out = env->GetStaticObjectField(system, outID);
+    jclass printStream = env->FindClass("java/io/PrintStream");
+    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
+    jstring jstr = env->NewStringUTF(str);
+    env->CallVoidMethod(out, printlnID, jstr);
 }
