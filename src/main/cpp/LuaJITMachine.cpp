@@ -109,30 +109,34 @@ static int initialized = 0;
 extern "C" {
 #endif
 
-static void dump_stack(lua_State *L) {
-    sysout("stack: [");
-
+static void dump_stack_element(lua_State *L, int i) {
     char buf[32];
 
     int top = lua_gettop(L);
+    int j = i - top - 1;
+    int t = lua_type(L, i);
+    switch (t) {
+        case LUA_TSTRING:
+            sprintf(buf, "%i (%i)  '%s'", i, j, lua_tostring(L, i));
+            break;
+        case LUA_TBOOLEAN:
+            sprintf(buf, "%i (%i)  %i", i, j, lua_toboolean(L, i) ? "true" : "false");
+            break;
+        case LUA_TNUMBER:
+            sprintf(buf, "%i (%i)  %g", i, j, lua_tonumber(L, i));
+            break;
+        default:
+            sprintf(buf, "%i (%i)  %s", i, j, lua_typename(L, t));
+            break;
+    }
+    sysout(buf);
+}
+
+static void dump_stack(lua_State *L) {
+    sysout("stack: [");
+    int top = lua_gettop(L);
     for (int i = top; i > 0; i--) {
-        int j = i - top - 1;
-        int t = lua_type(L, i);
-        switch (t) {
-            case LUA_TSTRING:
-                sprintf(buf, "%i (%i)  '%s'", i, j, lua_tostring(L, i));
-                break;
-            case LUA_TBOOLEAN:
-                sprintf(buf, "%i (%i)  %i", i, j, lua_toboolean(L, i) ? "true" : "false");
-                break;
-            case LUA_TNUMBER:
-                sprintf(buf, "%i (%i)  %g", i, j, lua_tonumber(L, i));
-                break;
-            default:
-                sprintf(buf, "%i (%i)  %s", i, j, lua_typename(L, t));
-                break;
-        }
-        sysout(buf);
+        dump_stack_element(L, i);   
     }
     sysout("]");
 }
@@ -260,24 +264,114 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
         return;
     }
 
-    if(object_class)            env->DeleteGlobalRef(object_class);
-    if(number_class)            env->DeleteGlobalRef(number_class);
-    if(integer_class)           env->DeleteGlobalRef(integer_class);
-    if(double_class)            env->DeleteGlobalRef(double_class);
-    if(boolean_class)           env->DeleteGlobalRef(boolean_class);
-    if(boolean_false)           env->DeleteGlobalRef(boolean_false);
-    if(string_class)            env->DeleteGlobalRef(string_class);
-    if(bytearray_class)         env->DeleteGlobalRef(bytearray_class);
-    if(map_class)               env->DeleteGlobalRef(map_class);
-    if(hashmap_class)           env->DeleteGlobalRef(hashmap_class);
-    if(set_class)               env->DeleteGlobalRef(set_class);
-    if(iterator_class)          env->DeleteGlobalRef(iterator_class);
-    if(identityhashmap_class)   env->DeleteGlobalRef(identityhashmap_class);
-    if(interruptedexception_class)          env->DeleteGlobalRef(interruptedexception_class);
-    if(machine_class)           env->DeleteGlobalRef(machine_class);
-    if(luacontext_class)        env->DeleteGlobalRef(luacontext_class);
-    if(iluaapi_class)           env->DeleteGlobalRef(iluaapi_class);
-    if(iluaobject_class)        env->DeleteGlobalRef(iluaobject_class); 
+    if(object_class)                    env->DeleteGlobalRef(object_class);
+    if(number_class)                    env->DeleteGlobalRef(number_class);
+    if(integer_class)                   env->DeleteGlobalRef(integer_class);
+    if(double_class)                    env->DeleteGlobalRef(double_class);
+    if(boolean_class)                   env->DeleteGlobalRef(boolean_class);
+    if(boolean_false)                   env->DeleteGlobalRef(boolean_false);
+    if(string_class)                    env->DeleteGlobalRef(string_class);
+    if(bytearray_class)                 env->DeleteGlobalRef(bytearray_class);
+    if(map_class)                       env->DeleteGlobalRef(map_class);
+    if(hashmap_class)                   env->DeleteGlobalRef(hashmap_class);
+    if(set_class)                       env->DeleteGlobalRef(set_class);
+    if(iterator_class)                  env->DeleteGlobalRef(iterator_class);
+    if(identityhashmap_class)           env->DeleteGlobalRef(identityhashmap_class);
+    if(interruptedexception_class)      env->DeleteGlobalRef(interruptedexception_class);
+    if(machine_class)                   env->DeleteGlobalRef(machine_class);
+    if(luacontext_class)                env->DeleteGlobalRef(luacontext_class);
+    if(iluaapi_class)                   env->DeleteGlobalRef(iluaapi_class);
+    if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
+}
+
+static int finalize_jobject_ref(lua_State *L) {
+    jobject *obj = (jobject*) luaL_checkudata(L, 1, "jobject_ref");
+    if(!obj) luaL_error(L, "Attempt to finalize finalized jobject_ref");
+
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        luaL_error(L, "JavaFN finalizer could not retrieve JNIEnv");
+        return 0;
+    }
+
+    env->DeleteGlobalRef(*obj);
+    *obj = 0;    
+    return 0;
+}
+
+static void new_jobject_ref(JNIEnv *env, lua_State *L, jobject obj) {
+    jobject *ud = (jobject*) lua_newuserdata(L, sizeof(jobject));
+    *ud = env->NewGlobalRef(obj);
+
+    if(luaL_newmetatable(L, "jobject_ref")) {
+        lua_pushstring(L, "__gc");
+        lua_pushcfunction(L, finalize_jobject_ref);
+        lua_settable(L, -3);
+    }
+
+    lua_setmetatable(L, -2);
+}
+
+static const char KEY_HOOK = 'h';
+
+static void thread_interrupt_hook(lua_State *L, lua_Debug *ar) {
+    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    lua_pushthread(L);
+    lua_gettable(L, -2);
+
+    jobject obj = *((jobject*) lua_touserdata(L, -1));
+    lua_pop(L, 1);
+
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        luaL_error(L, "JavaFN finalizer could not retrieve JNIEnv");
+        return;
+    }
+
+    jstring hardAbortMessage = (jstring) env->GetObjectField(obj, hard_abort_message_id);
+    if(hardAbortMessage) {
+        lua_pushnil(L);
+        lua_yield(L, 1);
+    }
+}
+
+static int coroutine_create(lua_State *L) {
+    lua_State *t = lua_newthread(L);
+    lua_pushvalue(L, -2);
+    lua_xmove(L, t, 1);
+
+    lua_sethook(t, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
+
+    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    lua_pushvalue(L, -2);
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_settable(L, -3);
+    lua_pop(L, 1);
+
+    lua_remove(L, -2);
+
+    return 1;
+}
+
+static void install_coroutine_create(JNIEnv *env, lua_State *L, jobject obj) {
+    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
+    lua_newtable(L);
+    
+    lua_newtable(L);
+    lua_pushstring(L, "__mode");
+    lua_pushstring(L, "k");
+    lua_settable(L, -3);
+
+    lua_setmetatable(L, -2);
+
+    lua_rawset(L, LUA_REGISTRYINDEX);
+
+    lua_getglobal(L, "coroutine");
+    new_jobject_ref(env, L, obj);
+    lua_pushcclosure(L, coroutine_create, 1);
+    lua_setfield(L, -2, "create");
 }
 
 CCLJ_JNIEXPORT(jboolean, createLuaState) {
@@ -293,6 +387,8 @@ CCLJ_JNIEXPORT(jboolean, createLuaState) {
     luaopen_bit(L);
 
     lua_pop(L, lua_gettop(L));
+
+    install_coroutine_create(env, L, obj);
 
     set_lua_state(env, obj, L);
 

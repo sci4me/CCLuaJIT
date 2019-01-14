@@ -99,6 +99,7 @@ public final class LuaJITMachine implements ILuaMachine {
     @Override
     public void finalize() {
         synchronized(this) {
+            System.out.println("LuaJITMachine finalize");
             if(this.luaState != 0) this.destroyLuaState();
         }
     }
