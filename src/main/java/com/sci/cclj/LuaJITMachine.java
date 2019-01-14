@@ -1,5 +1,6 @@
 package com.sci.cclj;
 
+import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.lua.ILuaMachine;
 
@@ -52,8 +53,8 @@ public final class LuaJITMachine implements ILuaMachine {
     private long mainRoutine;
 
     private String eventFilter;
-    private String hardAbortMessage;
-    private String softAbortMessage;
+    private volatile String hardAbortMessage;
+    private volatile String softAbortMessage;
 
     public LuaJITMachine(final IComputer computer) {
         this.computer = computer;
@@ -73,7 +74,7 @@ public final class LuaJITMachine implements ILuaMachine {
 
     private native boolean loadBios(final String bios);
 
-    private native Object[] resumeMainRoutine(final Object[] arguments);
+    private native Object[] resumeMainRoutine(final Object[] arguments) throws InterruptedException;
 
     public Object[] yield(final Object[] arguments) {
         if(arguments.length > 0 && arguments[0] instanceof String) {
@@ -131,47 +132,44 @@ public final class LuaJITMachine implements ILuaMachine {
     }
 
     @Override
-    public void handleEvent(final String eventName, final Object[] arguments) {
+    public void handleEvent(final String eventName, final Object[] args) {
         if(this.mainRoutine == 0) return;
 
+        final Object[] arguments;
+        if(args == null) {
+            arguments = new Object[0];
+        } else {
+            arguments = new Object[args.length + 1];
+            arguments[0] = eventName;
+            System.arraycopy(args, 0, arguments, 1, args.length);
+        }
+
         if(LuaJITMachine.isSpecialEvent(eventName)) {
-            final Object[] yieldArguments = new Object[arguments.length + 1];
-            yieldArguments[0] = eventName;
-            System.arraycopy(arguments, 0, yieldArguments, 1, arguments.length);
-            this.yieldResults.put(eventName, yieldArguments);
+            this.yieldResults.put(eventName, arguments);
             return;
         }
 
         if(this.eventFilter == null || eventName == null || eventName.equals(this.eventFilter) || eventName.equals("terminate")) {
-            final Object[] resumeArgs;
-            if(eventName == null) {
-                resumeArgs = new Object[0];
-            } else {
-                resumeArgs = new Object[arguments.length + 1];
-                resumeArgs[0] = eventName;
-                System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
-            }
+            try {
+                final Object[] results = this.resumeMainRoutine(arguments);
 
-            final Object[] results = this.resumeMainRoutine(resumeArgs);
-
-            if(this.hardAbortMessage != null) {
-                this.destroyLuaState();
-            } else if(results.length > 0 && results[0] instanceof Boolean && !(Boolean) results[0]) {
-                this.destroyLuaState();
-            } else {
-                for(final Object obj : results) System.out.print(obj + " ");
-                System.out.println();
-
-                final Object filter = results[1];
-                if(filter instanceof String) {
-                    this.eventFilter = (String) filter;
+                if(this.hardAbortMessage != null) {
+                    this.destroyLuaState();
+                } else if(results.length > 0 && results[0] instanceof Boolean && !(Boolean) results[0]) {
+                    this.destroyLuaState();
                 } else {
-                    this.eventFilter = null;
+                    if(results.length >= 2 && results[1] instanceof String) {
+                        this.eventFilter = (String) results[1];
+                    } else {
+                        this.eventFilter = null;
+                    }
                 }
+            } catch(final InterruptedException e) {
+                this.destroyLuaState();
+            } finally {
+                this.softAbortMessage = null;
+                this.hardAbortMessage = null;
             }
-
-            this.softAbortMessage = null;
-            this.hardAbortMessage = null;
         }
     }
 

@@ -16,6 +16,8 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
+// @TODO: Modify OSAPI queueEvent to prepend a sentinel object to arguments in case event filter is a special event
+
 public final class CCLJClassTransformer implements IClassTransformer {
     private static final Set<String> ANALYSIS_EXCLUSIONS;
 
@@ -170,12 +172,5 @@ public final class CCLJClassTransformer implements IClassTransformer {
         list.add(label);
 
         mn.instructions.insertBefore(mn.instructions.get(mn.instructions.indexOf(insn) - 2), list);
-
-        final Printer printer = new Textifier();
-        final TraceMethodVisitor visitor = new TraceMethodVisitor(printer);
-        mn.accept(visitor);
-        final StringWriter writer = new StringWriter();
-        printer.print(new PrintWriter(writer));
-        System.out.println(writer.toString());
     }
 }

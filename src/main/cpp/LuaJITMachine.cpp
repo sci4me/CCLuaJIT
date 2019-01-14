@@ -83,9 +83,14 @@ static jmethodID iterator_next_id = 0;
 static jclass identityhashmap_class = 0;
 static jmethodID identityhashmap_init_id = 0;
 
+static jclass interruptedexception_class = 0;
+static jmethodID interruptedexception_init_id = 0;
+
 static jclass machine_class = 0;
 static jfieldID lua_state_id = 0;
 static jfieldID main_routine_id = 0;
+static jfieldID soft_abort_message_id = 0;
+static jfieldID hard_abort_message_id = 0;
 
 static jclass luacontext_class = 0;
 static jmethodID luacontext_init_id = 0;
@@ -216,9 +221,16 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
+    if(!(interruptedexception_class = get_class_global_ref(env, "java/lang/InterruptedException")) ||
+        !(interruptedexception_init_id = env->GetMethodID(interruptedexception_class, "<init>", "(Ljava/lang/String;)V"))) {
+        return CCLJ_JNIVERSION;
+    }
+
     if(!(machine_class = get_class_global_ref(env, "com/sci/cclj/LuaJITMachine")) ||
         !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J")) ||
-        !(main_routine_id = env->GetFieldID(machine_class, "mainRoutine", "J"))) {
+        !(main_routine_id = env->GetFieldID(machine_class, "mainRoutine", "J")) ||
+        !(soft_abort_message_id = env->GetFieldID(machine_class, "softAbortMessage", "Ljava/lang/String;")) ||
+        !(hard_abort_message_id = env->GetFieldID(machine_class, "hardAbortMessage", "Ljava/lang/String;"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -261,6 +273,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(set_class)               env->DeleteGlobalRef(set_class);
     if(iterator_class)          env->DeleteGlobalRef(iterator_class);
     if(identityhashmap_class)   env->DeleteGlobalRef(identityhashmap_class);
+    if(interruptedexception_class)          env->DeleteGlobalRef(interruptedexception_class);
     if(machine_class)           env->DeleteGlobalRef(machine_class);
     if(luacontext_class)        env->DeleteGlobalRef(luacontext_class);
     if(iluaapi_class)           env->DeleteGlobalRef(iluaapi_class);
@@ -519,6 +532,15 @@ static JavaFN* check_java_fn(lua_State *L) {
     return jfn;
 }
 
+static void try_abort(JNIEnv *env, jobject obj) {
+    jstring softAbortMessage = (jstring) env->GetObjectField(obj, soft_abort_message_id);
+    if(softAbortMessage) {
+        env->SetObjectField(obj, soft_abort_message_id, 0);
+        env->SetObjectField(obj, hard_abort_message_id, 0);
+        env->Throw((jthrowable) env->NewObject(interruptedexception_class, interruptedexception_init_id, softAbortMessage));
+    }
+}
+
 static int invoke_java_fn(lua_State *L) {
     JNIEnv *env;
     if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
@@ -527,8 +549,14 @@ static int invoke_java_fn(lua_State *L) {
     }
 
     JavaFN *jfn = (JavaFN*) lua_touserdata(L, lua_upvalueindex(1));
+    jobject machine = jfn->machine;
 
-    jobject luaContext = env->NewObject(luacontext_class, luacontext_init_id, jfn->machine);
+    try_abort(env, machine);
+    if(env->ExceptionCheck()) {
+        return lua_yield(L, 0);
+    }
+
+    jobject luaContext = env->NewObject(luacontext_class, luacontext_init_id, machine);
 
     jobjectArray arguments = to_java_values(env, L, lua_gettop(L));
     jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, luaContext, jfn->index, arguments);
