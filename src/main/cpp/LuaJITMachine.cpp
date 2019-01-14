@@ -326,7 +326,7 @@ static int finalize_jobject_ref(lua_State *L) {
 
     JNIEnv *env;
     if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        luaL_error(L, "JavaFN finalizer could not retrieve JNIEnv");
+        luaL_error(L, "jobject_ref finalizer could not retrieve JNIEnv");
         return 0;
     }
 
@@ -356,12 +356,12 @@ static void thread_interrupt_hook(lua_State *L, lua_Debug *ar) {
     lua_pushthread(L);
     lua_gettable(L, -2);
 
-    jobject obj = *((jobject*) lua_touserdata(L, -1));
+    jobject obj = *((jobject*) luaL_checkudata(L, -1, "jobject_ref"));
     lua_pop(L, 1);
 
     JNIEnv *env;
     if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        luaL_error(L, "JavaFN finalizer could not retrieve JNIEnv");
+        luaL_error(L, "thread_interrupt_hook could not retrieve JNIEnv");
         return;
     }
 
@@ -649,7 +649,7 @@ typedef struct JavaFN {
 
 static JavaFN* check_java_fn(lua_State *L) {
     JavaFN *jfn = (JavaFN*) luaL_checkudata(L, 1, "JavaFN");
-    if(!jfn->obj) luaL_error(L, "Attempt to finalize finalized JavaFN");
+    if(!jfn->obj) luaL_error(L, "Attempt to access finalized JavaFN");
     return jfn;
 }
 

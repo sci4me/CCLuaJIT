@@ -136,21 +136,23 @@ public final class LuaJITMachine implements ILuaMachine {
     public void handleEvent(final String eventName, final Object[] args) {
         if(this.mainRoutine == 0) return;
 
-        final Object[] arguments;
-        if(args == null) {
-            arguments = new Object[0];
-        } else {
-            arguments = new Object[args.length + 1];
-            arguments[0] = eventName;
-            System.arraycopy(args, 0, arguments, 1, args.length);
-        }
-
-        if(LuaJITMachine.isSpecialEvent(eventName)) {
-            this.yieldResults.put(eventName, arguments);
-            return;
-        }
-
         if(this.eventFilter == null || eventName == null || eventName.equals(this.eventFilter) || eventName.equals("terminate")) {
+            final Object[] arguments;
+            if(eventName == null) {
+                arguments = new Object[0];
+            } else if(args == null) {
+                arguments = new Object[] { eventName };
+            } else {
+                arguments = new Object[args.length + 1];
+                arguments[0] = eventName;
+                System.arraycopy(args, 0, arguments, 1, args.length);
+            }
+    
+            if(LuaJITMachine.isSpecialEvent(eventName)) {
+                this.yieldResults.put(eventName, arguments);
+                return;
+            }
+
             try {
                 final Object[] results = this.resumeMainRoutine(arguments);
 
