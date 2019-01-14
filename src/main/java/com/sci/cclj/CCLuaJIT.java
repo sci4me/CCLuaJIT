@@ -19,7 +19,7 @@ public final class CCLuaJIT implements IFMLLoadingPlugin {
 
     @Override
     public String[] getASMTransformerClass() {
-        return new String[]{LuaJITMachineTransformer.class.getCanonicalName()};
+        return new String[]{CCLJClassTransformer.class.getCanonicalName()};
     }
 
     @Override

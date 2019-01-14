@@ -22,7 +22,7 @@ public final class LuaContext implements ILuaContext {
     }
 
     public Object[] yield(final Object[] arguments) throws InterruptedException {
-    	throw new RuntimeException("yield");
+        return this.machine.yield(arguments);
     }
 
     public Object[] executeMainThreadTask(final ILuaTask task) throws LuaException, InterruptedException {
