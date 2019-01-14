@@ -341,16 +341,16 @@ static int coroutine_create(lua_State *L) {
     lua_pushvalue(L, -2);
     lua_xmove(L, t, 1);
 
-    lua_sethook(t, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
-
     lua_pushlightuserdata(L, (void*)&KEY_HOOK);
     lua_rawget(L, LUA_REGISTRYINDEX);
     lua_pushvalue(L, -2);
     lua_pushvalue(L, lua_upvalueindex(1));
     lua_settable(L, -3);
-    lua_pop(L, 1);
 
+    lua_pop(L, 1);
     lua_remove(L, -2);
+
+    lua_sethook(t, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
 
     return 1;
 }
@@ -358,14 +358,11 @@ static int coroutine_create(lua_State *L) {
 static void install_coroutine_create(JNIEnv *env, lua_State *L, jobject obj) {
     lua_pushlightuserdata(L, (void*)&KEY_HOOK);
     lua_newtable(L);
-    
     lua_newtable(L);
     lua_pushstring(L, "__mode");
     lua_pushstring(L, "k");
     lua_settable(L, -3);
-
     lua_setmetatable(L, -2);
-
     lua_rawset(L, LUA_REGISTRYINDEX);
 
     lua_getglobal(L, "coroutine");
