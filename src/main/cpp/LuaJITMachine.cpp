@@ -19,6 +19,43 @@ extern "C" {
 
 #define CCLJ_JNIEXPORT(rtype, name, ...) JNIEXPORT rtype JNICALL Java_com_sci_cclj_LuaJITMachine_##name(JNIEnv *env, jobject obj, ##__VA_ARGS__)
 
+/*
+void sysout(jobject obj) {
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        return;
+    }
+
+    jclass system = get_class_global_ref(env, "java/lang/System");
+    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
+    jobject out = env->GetStaticObjectField(system, outID);
+    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
+    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/Object;)V");
+    env->CallVoidMethod(out, printlnID, obj);
+
+    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
+    env->CallVoidMethod(out, flushID);
+}
+
+void sysout(const char *str) {
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        return;
+    }
+
+    jclass system = get_class_global_ref(env, "java/lang/System");
+    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
+    jobject out = env->GetStaticObjectField(system, outID);
+    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
+    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
+    jstring jstr = env->NewStringUTF(str);
+    env->CallVoidMethod(out, printlnID, jstr);
+
+    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
+    env->CallVoidMethod(out, flushID);
+}
+*/
+
 static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress);
 static void map_to_table(JNIEnv *env, lua_State *L, jobject map);
 static jobject table_to_map(JNIEnv *env, lua_State *L, jobject objectsInProgress);
@@ -35,9 +72,6 @@ static lua_State* get_lua_state(JNIEnv *env, jobject obj);
 static void set_lua_state(JNIEnv *env, jobject obj, lua_State *L);
 static lua_State* get_main_routine(JNIEnv *env, jobject obj);
 static void set_main_routine(JNIEnv *env, jobject obj, lua_State *L);
-
-static void sysout(jobject obj);
-static void sysout(const char *str);
 
 static jclass object_class = 0;
 
@@ -109,6 +143,7 @@ static int initialized = 0;
 extern "C" {
 #endif
 
+/*
 static void dump_stack_element(lua_State *L, int i) {
     char buf[32];
 
@@ -140,6 +175,7 @@ static void dump_stack(lua_State *L) {
     }
     sysout("]");
 }
+*/
 
 static jclass get_class_global_ref(JNIEnv *env, const char *name) {
     jclass clazz = env->FindClass(name);
@@ -447,7 +483,6 @@ CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
     int after = lua_gettop(L);
 
     jobjectArray results;
-
     if(stat == LUA_YIELD || stat == 0) {
         int nresults = after - before;
         if(nresults > 0) {
@@ -455,11 +490,6 @@ CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
         } else {
             results = env->NewObjectArray(0, object_class, 0);
         }
-
-        // @TODO ?
-        // if(stat == 0) {
-        //     Java_com_sci_cclj_LuaJITMachine_destroyLuaState(env, obj);
-        // }
     } else {
         results = env->NewObjectArray(2, object_class, 0);
         env->SetObjectArrayElement(results, 0, boolean_false);
@@ -506,9 +536,7 @@ static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject machine
 }
 
 static jobject table_to_map(JNIEnv *env, lua_State *L, jobject objectsInProgress) {
-    sysout("TABLE_TO_MAP!!!");
-    sysout("TABLE_TO_MAP!!!");
-    sysout("TABLE_TO_MAP!!!");
+    // @TODO
 }
 
 static jobject table_to_map(JNIEnv *env, lua_State *L) {
@@ -737,39 +765,4 @@ lua_State *get_main_routine(JNIEnv *env, jobject obj) {
 
 void set_main_routine(JNIEnv *env, jobject obj, lua_State *L) {
     env->SetLongField(obj, main_routine_id, (jlong) L);
-}
-
-void sysout(jobject obj) {
-    JNIEnv *env;
-    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        return;
-    }
-
-    jclass system = get_class_global_ref(env, "java/lang/System");
-    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
-    jobject out = env->GetStaticObjectField(system, outID);
-    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
-    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/Object;)V");
-    env->CallVoidMethod(out, printlnID, obj);
-
-    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
-    env->CallVoidMethod(out, flushID);
-}
-
-void sysout(const char *str) {
-    JNIEnv *env;
-    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        return;
-    }
-
-    jclass system = get_class_global_ref(env, "java/lang/System");
-    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
-    jobject out = env->GetStaticObjectField(system, outID);
-    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
-    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
-    jstring jstr = env->NewStringUTF(str);
-    env->CallVoidMethod(out, printlnID, jstr);
-
-    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
-    env->CallVoidMethod(out, flushID);
 }
