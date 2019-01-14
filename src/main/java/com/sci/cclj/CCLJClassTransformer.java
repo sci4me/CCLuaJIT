@@ -5,18 +5,14 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
-import org.objectweb.asm.util.Printer;
-import org.objectweb.asm.util.Textifier;
-import org.objectweb.asm.util.TraceMethodVisitor;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
 // @TODO: Modify OSAPI queueEvent to prepend a sentinel object to arguments in case event filter is a special event
+// @TODO: Once we're transforming >1 class, use a Set<String> to check if class 'name' is being transformed
 
 public final class CCLJClassTransformer implements IClassTransformer {
     private static final Set<String> ANALYSIS_EXCLUSIONS;

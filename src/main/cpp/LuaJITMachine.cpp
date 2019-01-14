@@ -532,13 +532,22 @@ static JavaFN* check_java_fn(lua_State *L) {
     return jfn;
 }
 
-static void try_abort(JNIEnv *env, jobject obj) {
+static int try_abort(JNIEnv *env, jobject obj, lua_State *L) {
+    int result = 0;
     jstring softAbortMessage = (jstring) env->GetObjectField(obj, soft_abort_message_id);
     if(softAbortMessage) {
         env->SetObjectField(obj, soft_abort_message_id, 0);
         env->SetObjectField(obj, hard_abort_message_id, 0);
-        env->Throw((jthrowable) env->NewObject(interruptedexception_class, interruptedexception_init_id, softAbortMessage));
+
+        const char *cstr = env->GetStringUTFChars(softAbortMessage, JNI_FALSE);
+        lua_pushstring(L, cstr);
+        env->ReleaseStringUTFChars(softAbortMessage, cstr);
+
+        lua_error(L);
+        result = 1;
     }
+    env->DeleteLocalRef(softAbortMessage);
+    return result;
 }
 
 static int invoke_java_fn(lua_State *L) {
@@ -551,9 +560,8 @@ static int invoke_java_fn(lua_State *L) {
     JavaFN *jfn = (JavaFN*) lua_touserdata(L, lua_upvalueindex(1));
     jobject machine = jfn->machine;
 
-    try_abort(env, machine);
-    if(env->ExceptionCheck()) {
-        return lua_yield(L, 0);
+    if(try_abort(env, machine, L)) {
+        return 0;
     }
 
     jobject luaContext = env->NewObject(luacontext_class, luacontext_init_id, machine);
