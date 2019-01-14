@@ -24,13 +24,12 @@ static void map_to_table(JNIEnv *env, lua_State *L, jobject map);
 static jobject table_to_map(JNIEnv *env, lua_State *L, jobject objectsInProgress);
 static jobject table_to_map(JNIEnv *env, lua_State *L);
 
-static void to_lua_value(JNIEnv *env, lua_State *L, jobject value);
+static void to_lua_value(JNIEnv *env, lua_State *L, jobject value, jobject machine);
+static void to_lua_values(JNIEnv *env, lua_State *L, jobjectArray values, jobject machine);
 static jobject to_java_value(JNIEnv *env, lua_State *L);
-
-static void to_lua_values(JNIEnv *env, lua_State *L, jobjectArray values);
 static jobjectArray to_java_values(JNIEnv *env, lua_State *L, int n);
 
-static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj);
+static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj, jobject machine);
 
 static lua_State* get_lua_state(JNIEnv *env, jobject obj);
 static void set_lua_state(JNIEnv *env, jobject obj, lua_State *L);
@@ -224,7 +223,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
     }
 
     if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/LuaContext")) ||
-        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "()V"))) {
+        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "(Lcom/sci/cclj/LuaJITMachine;)V"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -299,7 +298,7 @@ CCLJ_JNIEXPORT(void, destroyLuaState) {
 CCLJ_JNIEXPORT(jboolean, registerAPI, jobject api) {
     lua_State *L = get_lua_state(env, obj);
 
-    int table = wrap_lua_object(env, L, api);    
+    int table = wrap_lua_object(env, L, api, obj);    
 
     jobjectArray names = (jobjectArray) env->CallObjectMethod(api, get_names_id);
     jsize len = env->GetArrayLength(names);
@@ -336,19 +335,10 @@ CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
 CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
     lua_State *L = get_main_routine(env, obj);
 
-    dump_stack(L);
-
-    int nargs = env->GetArrayLength(args);
     int before = lua_gettop(L);
-    to_lua_values(env, L, args);
-    int stat = lua_resume(L, nargs);
+    to_lua_values(env, L, args, obj);
+    int stat = lua_resume(L, env->GetArrayLength(args));
     int after = lua_gettop(L);
-
-    char buf[256];
-    sprintf(buf, "before: %i | after: %i | nargs: %i", before, after, nargs);
-    sysout(buf);
-
-    dump_stack(L);
 
     jobjectArray results;
 
@@ -377,7 +367,7 @@ CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
 }
 #endif
 
-static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress) {
+static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress, jobject machine) {
     if(env->CallBooleanMethod(valuesInProgress, map_containskey_id, map)) {
         jobject bidx = env->CallObjectMethod(valuesInProgress, map_get_id, map);
         jint idx = env->CallStaticIntMethod(integer_class, intvalue_id, bidx);
@@ -398,15 +388,15 @@ static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesI
         jobject key = env->CallObjectMethod(next, map_entry_getkey_id);
         jobject value = env->CallObjectMethod(next, map_entry_getvalue_id);
 
-        to_lua_value(env, L, key);
-        to_lua_value(env, L, value);
+        to_lua_value(env, L, key, machine);
+        to_lua_value(env, L, value, machine);
         lua_settable(L, idx);
     }
 }
 
-static void map_to_table(JNIEnv *env, lua_State *L, jobject map) {
+static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject machine) {
     jobject vip = env->NewObject(identityhashmap_class, identityhashmap_init_id);
-    map_to_table(env, L, map, vip);
+    map_to_table(env, L, map, vip, machine);
 }
 
 static jobject table_to_map(JNIEnv *env, lua_State *L, jobject objectsInProgress) {
@@ -420,7 +410,7 @@ static jobject table_to_map(JNIEnv *env, lua_State *L) {
     return table_to_map(env, L, oip);
 }
 
-static void to_lua_value(JNIEnv *env, lua_State *L, jobject value) {
+static void to_lua_value(JNIEnv *env, lua_State *L, jobject value, jobject machine) {
     if(value == 0) {
         lua_pushnil(L);
     } else if(env->IsInstanceOf(value, number_class)) {
@@ -447,19 +437,19 @@ static void to_lua_value(JNIEnv *env, lua_State *L, jobject value) {
 
         env->ReleaseByteArrayElements(a, ca, JNI_ABORT);
     } else if(env->IsInstanceOf(value, map_class)) {
-        map_to_table(env, L, value);
+        map_to_table(env, L, value, machine);
     } else if(env->IsInstanceOf(value, iluaobject_class)) {
-        wrap_lua_object(env, L, value);
+        wrap_lua_object(env, L, value, machine);
     } else {
         luaL_error(L, "Attempt to convert unrecognized Java value to a Lua value!");
     }
 }
 
-static void to_lua_values(JNIEnv *env, lua_State *L, jobjectArray values) {
+static void to_lua_values(JNIEnv *env, lua_State *L, jobjectArray values, jobject machine) {
     jsize len = env->GetArrayLength(values);
     for(jsize i = 0; i < len; i++) {
         jobject elem = env->GetObjectArrayElement(values, i);
-        to_lua_value(env, L, elem);
+        to_lua_value(env, L, elem, machine);
         env->DeleteLocalRef(elem);
     }
 }
@@ -518,6 +508,7 @@ static jobjectArray to_java_values(JNIEnv *env, lua_State *L, int n) {
 }
 
 typedef struct JavaFN {
+    jobject machine;
     jobject obj;
     int index;
 } JavaFN;
@@ -537,13 +528,13 @@ static int invoke_java_fn(lua_State *L) {
 
     JavaFN *jfn = (JavaFN*) lua_touserdata(L, lua_upvalueindex(1));
 
-    jobject luaContext = env->NewObject(luacontext_class, luacontext_init_id);
+    jobject luaContext = env->NewObject(luacontext_class, luacontext_init_id, jfn->machine);
 
     jobjectArray arguments = to_java_values(env, L, lua_gettop(L));
     jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, luaContext, jfn->index, arguments);
 
     if(results) {
-        to_lua_values(env, L, results);
+        to_lua_values(env, L, results, jfn->machine);
         return env->GetArrayLength(results);
     } else {
         return 0;
@@ -559,14 +550,16 @@ static int finalize_java_fn(lua_State *L) {
         return 0;
     }
 
+    env->DeleteGlobalRef(jfn->machine);
     env->DeleteGlobalRef(jfn->obj);
 
     jfn->obj = 0;
     return 0;
 }
 
-static void new_java_fn(JNIEnv *env, lua_State *L, jobject obj, int index) {
+static void new_java_fn(JNIEnv *env, lua_State *L, jobject obj, int index, jobject machine) {
     JavaFN *jfn = (JavaFN*) lua_newuserdata(L, sizeof(JavaFN));
+    jfn->machine = env->NewGlobalRef(machine);
     jfn->obj = env->NewGlobalRef(obj);
     jfn->index = index;
 
@@ -579,7 +572,7 @@ static void new_java_fn(JNIEnv *env, lua_State *L, jobject obj, int index) {
     lua_setmetatable(L, -2);
 }
 
-static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj) {
+static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj, jobject machine) {
     lua_newtable(L);
     int table = lua_gettop(L);
 
@@ -590,7 +583,7 @@ static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj) {
         const char *methodNamec = env->GetStringUTFChars(methodName, JNI_FALSE);
 
         lua_pushstring(L, methodNamec);
-        new_java_fn(env, L, obj, i);
+        new_java_fn(env, L, obj, i, machine);
         lua_pushcclosure(L, invoke_java_fn, 1);
         lua_settable(L, table);
 

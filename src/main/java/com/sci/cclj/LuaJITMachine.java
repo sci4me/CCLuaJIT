@@ -90,37 +90,38 @@ public final class LuaJITMachine implements ILuaMachine {
     @Override
     public void handleEvent(final String eventName, final Object[] arguments) {
         if(this.mainRoutine == 0) return;
-        if(this.eventFilter != null && eventName != null && !eventName.equals(this.eventFilter) && !eventName.equals("terminate")) return;
-
-        final Object[] resumeArgs;
-        if(eventName == null) {
-            resumeArgs = new Object[0];
-        } else {
-            resumeArgs = new Object[arguments.length + 1];
-            resumeArgs[0] = eventName;
-            System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
-        }
-
-        final Object[] results = this.resumeMainRoutine(resumeArgs);
-
-        if(this.hardAbortMessage != null) {
-            this.destroyLuaState();
-        } else if (results.length > 0 && results[0] instanceof Boolean && ((Boolean) results[0]).booleanValue() == false) {
-            this.destroyLuaState();
-        } else {
-            for(final Object obj : results) System.out.print(obj + " ");
-            System.out.println();
-
-            final Object filter = results[1];
-            if(filter instanceof String) {
-                this.eventFilter = (String) filter;
+    
+        if(this.eventFilter == null || eventName == null || eventName.equals(this.eventFilter) || eventName.equals("terminate")) {
+            final Object[] resumeArgs;
+            if(eventName == null) {
+                resumeArgs = new Object[0];
             } else {
-                this.eventFilter = null;
+                resumeArgs = new Object[arguments.length + 1];
+                resumeArgs[0] = eventName;
+                System.arraycopy(arguments, 0, resumeArgs, 1, arguments.length);
             }
-        }
 
-        this.softAbortMessage = null;
-        this.hardAbortMessage = null;
+            final Object[] results = this.resumeMainRoutine(resumeArgs);
+
+            if(this.hardAbortMessage != null) {
+                this.destroyLuaState();
+            } else if (results.length > 0 && results[0] instanceof Boolean && !((Boolean) results[0]).booleanValue()) {
+                this.destroyLuaState();
+            } else {
+                for(final Object obj : results) System.out.print(obj + " ");
+                System.out.println();
+
+                final Object filter = results[1];
+                if(filter instanceof String) {
+                    this.eventFilter = (String) filter;
+                } else {
+                    this.eventFilter = null;
+                }
+            }
+
+            this.softAbortMessage = null;
+            this.hardAbortMessage = null;
+        }
     }
 
     @Override
