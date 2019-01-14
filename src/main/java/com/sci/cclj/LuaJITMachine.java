@@ -135,7 +135,10 @@ public final class LuaJITMachine implements ILuaMachine {
         if(this.mainRoutine == 0) return;
 
         if(LuaJITMachine.isSpecialEvent(eventName)) {
-            this.yieldResults.put(eventName, arguments);
+            final Object[] yieldArguments = new Object[arguments.length + 1];
+            yieldArguments[0] = eventName;
+            System.arraycopy(arguments, 0, yieldArguments, 1, arguments.length);
+            this.yieldResults.put(eventName, yieldArguments);
             return;
         }
 
@@ -153,7 +156,7 @@ public final class LuaJITMachine implements ILuaMachine {
 
             if(this.hardAbortMessage != null) {
                 this.destroyLuaState();
-            } else if(results.length > 0 && results[0] instanceof Boolean && !((Boolean) results[0]).booleanValue()) {
+            } else if(results.length > 0 && results[0] instanceof Boolean && !(Boolean) results[0]) {
                 this.destroyLuaState();
             } else {
                 for(final Object obj : results) System.out.print(obj + " ");

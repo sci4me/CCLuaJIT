@@ -30,11 +30,11 @@ public final class CCLJClassTransformer implements IClassTransformer {
     private static final String LUAJ_MACHINE_DESC = "dan200/computercraft/core/lua/LuaJLuaMachine";
     private static final String ILUACONTEXT_DESC = "dan200/computercraft/api/lua/ILuaContext";
     private static final String COMPUTERTHREAD_DESC = "dan200/computercraft/core/computer/ComputerThread";
-    private static final String MAINTHREAD_DESC = "dan200/computercraft/core/computer/MainThread";
+    private static final String ILUAMACHINE_DESC = "dan200/computercraft/core/lua/ILuaMachine";
 
     private static final String PULLEVENT_DESC = "(Ljava/lang/String;)[Ljava/lang/Object;";
     private static final String COMPUTERTHREAD_QUEUETASK_DESC = "(Ldan200/computercraft/core/computer/ITask;Ldan200/computercraft/core/computer/Computer;)V";
-    private static final String MAINTHREAD_QUEUETASK_DESC = "(Ldan200/computercraft/core/computer/ITask;)Z";
+    private static final String HANDLEEVENT_DESC = "(Ljava/lang/String;[Ljava/lang/Object;)V";
 
     private static final String ICOMPUTER_DESC = "com/sci/cclj/IComputer";
     private static final String CCLJ_MACHINE_DESC = "com/sci/cclj/LuaJITMachine";
@@ -162,9 +162,11 @@ public final class CCLJClassTransformer implements IClassTransformer {
         list.add(new MethodInsnNode(Opcodes.INVOKESTATIC, CCLJ_MACHINE_DESC, "isSpecialEvent", "(Ljava/lang/String;)Z", false));
         final LabelNode label = new LabelNode();
         list.add(new JumpInsnNode(Opcodes.IFEQ, label));
-        list.add(new VarInsnNode(Opcodes.ALOAD, 4));
-        list.add(new MethodInsnNode(Opcodes.INVOKESTATIC, MAINTHREAD_DESC, "queueTask", MAINTHREAD_QUEUETASK_DESC, false));
-        list.add(new InsnNode(Opcodes.POP)); // @TODO: check this!!!
+        list.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        list.add(new FieldInsnNode(Opcodes.GETFIELD, COMPUTER_DESC, "m_machine", String.format("L%s;", ILUAMACHINE_DESC)));
+        list.add(new VarInsnNode(Opcodes.ALOAD, 1));
+        list.add(new VarInsnNode(Opcodes.ALOAD, 2));
+        list.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, ILUAMACHINE_DESC, "handleEvent", HANDLEEVENT_DESC));
         list.add(label);
 
         mn.instructions.insertBefore(mn.instructions.get(mn.instructions.indexOf(insn) - 2), list);
