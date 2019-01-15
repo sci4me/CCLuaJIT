@@ -7,7 +7,6 @@ import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.lua.ILuaMachine;
 
 import java.io.*;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -87,10 +86,15 @@ public final class LuaJITMachine implements ILuaMachine {
             }
 
             while(true) {
-                // @TODO: this is a problem... we can't just spin here... we'll get "Too long without yielding"...
                 synchronized(this.yieldResultsLock) {
                     if(this.yieldResults.containsKey(filter)) {
                         return this.yieldResults.get(filter).remove(0);
+                    }
+
+                    try {
+                        this.yieldResultsLock.wait();
+                    } catch(InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
             }
@@ -154,6 +158,7 @@ public final class LuaJITMachine implements ILuaMachine {
             if(LuaJITMachine.isSpecialEvent(eventName)) {
                 synchronized(this.yieldResultsLock) {
                     this.yieldResults.put(eventName, arguments);
+                    this.yieldResultsLock.notifyAll();
                 }
                 return;
             }
