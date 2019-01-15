@@ -1,6 +1,8 @@
 package com.sci.cclj.computer;
 
 import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimaps;
 import com.sci.cclj.CCLuaJIT;
 import com.sci.cclj.util.OS;
 import dan200.computercraft.core.apis.ILuaAPI;
@@ -47,8 +49,8 @@ public final class LuaJITMachine implements ILuaMachine {
 
     public final IComputer computer;
 
-    private final Object yieldResultsLock = new Object();
-    private final LinkedListMultimap<String, Object[]> yieldResults;
+    private final Object yieldResultsSignal = new Object();
+    private final ListMultimap<String, Object[]> yieldResults;
 
     private long luaState;
     private long mainRoutine;
@@ -60,7 +62,7 @@ public final class LuaJITMachine implements ILuaMachine {
     public LuaJITMachine(final IComputer computer) {
         this.computer = computer;
 
-        this.yieldResults = LinkedListMultimap.create();
+        this.yieldResults = Multimaps.synchronizedListMultimap(LinkedListMultimap.create());
 
         if(!this.createLuaState()) {
             throw new RuntimeException("Failed to create native Lua state");
@@ -86,13 +88,13 @@ public final class LuaJITMachine implements ILuaMachine {
             }
 
             while(true) {
-                synchronized(this.yieldResultsLock) {
-                    if(this.yieldResults.containsKey(filter)) {
-                        return this.yieldResults.get(filter).remove(0);
-                    }
+                if(this.yieldResults.containsKey(filter)) {
+                    return this.yieldResults.get(filter).remove(0);
+                }
 
+                synchronized(this.yieldResultsSignal) {
                     try {
-                        this.yieldResultsLock.wait();
+                        this.yieldResultsSignal.wait();
                     } catch(InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -156,9 +158,9 @@ public final class LuaJITMachine implements ILuaMachine {
             }
 
             if(LuaJITMachine.isSpecialEvent(eventName)) {
-                synchronized(this.yieldResultsLock) {
-                    this.yieldResults.put(eventName, arguments);
-                    this.yieldResultsLock.notifyAll();
+                this.yieldResults.put(eventName, arguments);
+                synchronized(this.yieldResultsSignal) {
+                    this.yieldResultsSignal.notifyAll();
                 }
                 return;
             }
