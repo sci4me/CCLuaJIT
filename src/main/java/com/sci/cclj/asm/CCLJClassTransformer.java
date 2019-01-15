@@ -51,16 +51,6 @@ public final class CCLJClassTransformer implements IClassTransformer {
             final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             cn.accept(cw);
             return cw.toByteArray();
-        } else if(name.equals(TERMINAL_CLASS)) {
-            final ClassNode cn = new ClassNode();
-            final ClassReader cr = new ClassReader(basicClass);
-            cr.accept(cn, 0);
-
-            this.transformTerminal(cn);
-
-            final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            cn.accept(cw);
-            return cw.toByteArray();
         } else {
             if(!CCLJClassTransformer.ANALYSIS_EXCLUSIONS.contains(name)) {
                 final ClassNode cn = new ClassNode();
@@ -72,26 +62,6 @@ public final class CCLJClassTransformer implements IClassTransformer {
 
             return basicClass;
         }
-    }
-
-    private void transformTerminal(final ClassNode cn) {
-        final Optional<MethodNode> mno = cn.methods
-                .stream()
-                .filter(m -> m.name.equals("write"))
-                .findFirst();
-
-        if(!mno.isPresent()) {
-            throw new RuntimeException("write not found in " + TERMINAL_CLASS);
-        }
-
-        final MethodNode mn = mno.get();
-
-        final InsnList list = new InsnList();
-        list.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
-        list.add(new VarInsnNode(Opcodes.ALOAD, 1));
-        list.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V"));
-
-        mn.instructions.insertBefore(mn.instructions.get(0), list);
     }
 
     private void scanForPullEvents(final ClassNode cn) {
