@@ -1,5 +1,6 @@
-package com.sci.cclj;
+package com.sci.cclj.asm;
 
+import com.sci.cclj.computer.LuaJITMachine;
 import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -19,11 +20,12 @@ public final class CCLJClassTransformer implements IClassTransformer {
 
     static {
         final Set<String> exclusions = new HashSet<>();
-        exclusions.add("com.sci.cclj.LuaContext");
+        exclusions.add("com.sci.cclj.computer.LuaContext");
         ANALYSIS_EXCLUSIONS = exclusions;
     }
 
     private static final String COMPUTER_CLASS = "dan200.computercraft.core.computer.Computer";
+    private static final String TERMINAL_CLASS = "dan200.computercraft.core.terminal.Terminal";
     private static final String COMPUTER_DESC = "dan200/computercraft/core/computer/Computer";
     private static final String LUAJ_MACHINE_DESC = "dan200/computercraft/core/lua/LuaJLuaMachine";
     private static final String ILUACONTEXT_DESC = "dan200/computercraft/api/lua/ILuaContext";
@@ -34,8 +36,8 @@ public final class CCLJClassTransformer implements IClassTransformer {
     private static final String COMPUTERTHREAD_QUEUETASK_DESC = "(Ldan200/computercraft/core/computer/ITask;Ldan200/computercraft/core/computer/Computer;)V";
     private static final String HANDLEEVENT_DESC = "(Ljava/lang/String;[Ljava/lang/Object;)V";
 
-    private static final String ICOMPUTER_DESC = "com/sci/cclj/IComputer";
-    private static final String CCLJ_MACHINE_DESC = "com/sci/cclj/LuaJITMachine";
+    private static final String ICOMPUTER_DESC = "com/sci/cclj/computer/IComputer";
+    private static final String CCLJ_MACHINE_DESC = "com/sci/cclj/computer/LuaJITMachine";
 
     @Override
     public byte[] transform(final String name, final String transformedName, final byte[] basicClass) {
@@ -45,6 +47,16 @@ public final class CCLJClassTransformer implements IClassTransformer {
             cr.accept(cn, 0);
 
             this.transformComputer(cn);
+
+            final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            cn.accept(cw);
+            return cw.toByteArray();
+        } else if(name.equals(TERMINAL_CLASS)) {
+            final ClassNode cn = new ClassNode();
+            final ClassReader cr = new ClassReader(basicClass);
+            cr.accept(cn, 0);
+
+            this.transformTerminal(cn);
 
             final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             cn.accept(cw);
@@ -60,6 +72,26 @@ public final class CCLJClassTransformer implements IClassTransformer {
 
             return basicClass;
         }
+    }
+
+    private void transformTerminal(final ClassNode cn) {
+        final Optional<MethodNode> mno = cn.methods
+                .stream()
+                .filter(m -> m.name.equals("write"))
+                .findFirst();
+
+        if(!mno.isPresent()) {
+            throw new RuntimeException("write not found in " + TERMINAL_CLASS);
+        }
+
+        final MethodNode mn = mno.get();
+
+        final InsnList list = new InsnList();
+        list.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
+        list.add(new VarInsnNode(Opcodes.ALOAD, 1));
+        list.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V"));
+
+        mn.instructions.insertBefore(mn.instructions.get(0), list);
     }
 
     private void scanForPullEvents(final ClassNode cn) {

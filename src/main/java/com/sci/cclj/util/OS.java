@@ -1,4 +1,4 @@
-package com.sci.cclj;
+package com.sci.cclj.util;
 
 public enum OS {
     WINDOWS,

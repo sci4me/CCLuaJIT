@@ -17,44 +17,12 @@ extern "C" {
 
 #define CCLJ_JNIVERSION JNI_VERSION_1_6
 
-#define CCLJ_JNIEXPORT(rtype, name, ...) JNIEXPORT rtype JNICALL Java_com_sci_cclj_LuaJITMachine_##name(JNIEnv *env, jobject obj, ##__VA_ARGS__)
+#define CCLJ_JNIEXPORT(rtype, name, ...) JNIEXPORT rtype JNICALL Java_com_sci_cclj_computer_LuaJITMachine_##name(JNIEnv *env, jobject obj, ##__VA_ARGS__)
 
-/*
-void sysout(jobject obj) {
-    JNIEnv *env;
-    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        return;
-    }
-
-    jclass system = get_class_global_ref(env, "java/lang/System");
-    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
-    jobject out = env->GetStaticObjectField(system, outID);
-    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
-    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/Object;)V");
-    env->CallVoidMethod(out, printlnID, obj);
-
-    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
-    env->CallVoidMethod(out, flushID);
-}
-
-void sysout(const char *str) {
-    JNIEnv *env;
-    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        return;
-    }
-
-    jclass system = get_class_global_ref(env, "java/lang/System");
-    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
-    jobject out = env->GetStaticObjectField(system, outID);
-    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
-    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
-    jstring jstr = env->NewStringUTF(str);
-    env->CallVoidMethod(out, printlnID, jstr);
-
-    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
-    env->CallVoidMethod(out, flushID);
-}
-*/
+static void sysout(const char *str);
+static void sysout(jobject obj);
+static void dump_stack_element(lua_State *L, int i);
+static void dump_stack(lua_State *L);
 
 static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress);
 static void map_to_table(JNIEnv *env, lua_State *L, jobject map);
@@ -143,40 +111,6 @@ static int initialized = 0;
 extern "C" {
 #endif
 
-/*
-static void dump_stack_element(lua_State *L, int i) {
-    char buf[32];
-
-    int top = lua_gettop(L);
-    int j = i - top - 1;
-    int t = lua_type(L, i);
-    switch (t) {
-        case LUA_TSTRING:
-            sprintf(buf, "%i (%i)  '%s'", i, j, lua_tostring(L, i));
-            break;
-        case LUA_TBOOLEAN:
-            sprintf(buf, "%i (%i)  %i", i, j, lua_toboolean(L, i) ? "true" : "false");
-            break;
-        case LUA_TNUMBER:
-            sprintf(buf, "%i (%i)  %g", i, j, lua_tonumber(L, i));
-            break;
-        default:
-            sprintf(buf, "%i (%i)  %s", i, j, lua_typename(L, t));
-            break;
-    }
-    sysout(buf);
-}
-
-static void dump_stack(lua_State *L) {
-    sysout("stack: [");
-    int top = lua_gettop(L);
-    for (int i = top; i > 0; i--) {
-        dump_stack_element(L, i);   
-    }
-    sysout("]");
-}
-*/
-
 static jclass get_class_global_ref(JNIEnv *env, const char *name) {
     jclass clazz = env->FindClass(name);
     if(!clazz) return 0;
@@ -185,6 +119,7 @@ static jclass get_class_global_ref(JNIEnv *env, const char *name) {
 
 JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
     jvm = vm;
+
 
 	JNIEnv *env;
 	if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
@@ -266,7 +201,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
-    if(!(machine_class = get_class_global_ref(env, "com/sci/cclj/LuaJITMachine")) ||
+    if(!(machine_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaJITMachine")) ||
         !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J")) ||
         !(main_routine_id = env->GetFieldID(machine_class, "mainRoutine", "J")) ||
         !(soft_abort_message_id = env->GetFieldID(machine_class, "softAbortMessage", "Ljava/lang/String;")) ||
@@ -274,8 +209,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
-    if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/LuaContext")) ||
-        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "(Lcom/sci/cclj/LuaJITMachine;)V"))) {
+    if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaContext")) ||
+        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "(Lcom/sci/cclj/computer/LuaJITMachine;)V"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -372,20 +307,21 @@ static void thread_interrupt_hook(lua_State *L, lua_Debug *ar) {
     }
 }
 
+static void register_coroutine(lua_State *L, int ti, int ui) {
+    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    lua_pushvalue(L, ti);
+    lua_pushvalue(L, ui);
+    lua_settable(L, -3);
+    lua_pop(L, 1);
+}
+
 static int coroutine_create(lua_State *L) {
     lua_State *t = lua_newthread(L);
     lua_pushvalue(L, -2);
     lua_xmove(L, t, 1);
 
-    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
-    lua_rawget(L, LUA_REGISTRYINDEX);
-    lua_pushvalue(L, -2);
-    lua_pushvalue(L, lua_upvalueindex(1));
-    lua_settable(L, -3);
-
-    lua_pop(L, 1);
-    lua_remove(L, -2);
-
+    register_coroutine(L, lua_gettop(L), lua_upvalueindex(1));
     lua_sethook(t, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
 
     return 1;
@@ -468,6 +404,11 @@ CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
     int err = luaL_loadbuffer(main_routine, biosc, strlen(biosc), "bios.lua");
     env->ReleaseStringUTFChars(bios, biosc);
     if(err) return 0;
+
+    new_jobject_ref(env, L, obj);
+    register_coroutine(L, -2, -1);
+    lua_pop(L, 1);
+    lua_remove(L, -2);
 
     set_main_routine(env, obj, main_routine);
 
@@ -765,4 +706,71 @@ lua_State *get_main_routine(JNIEnv *env, jobject obj) {
 
 void set_main_routine(JNIEnv *env, jobject obj, lua_State *L) {
     env->SetLongField(obj, main_routine_id, (jlong) L);
+}
+
+void sysout(jobject obj) {
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        return;
+    }
+
+    jclass system = get_class_global_ref(env, "java/lang/System");
+    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
+    jobject out = env->GetStaticObjectField(system, outID);
+    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
+    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/Object;)V");
+    env->CallVoidMethod(out, printlnID, obj);
+
+    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
+    env->CallVoidMethod(out, flushID);
+}
+
+void sysout(const char *str) {
+    JNIEnv *env;
+    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        return;
+    }
+
+    jclass system = get_class_global_ref(env, "java/lang/System");
+    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
+    jobject out = env->GetStaticObjectField(system, outID);
+    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
+    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
+    jstring jstr = env->NewStringUTF(str);
+    env->CallVoidMethod(out, printlnID, jstr);
+
+    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
+    env->CallVoidMethod(out, flushID);
+}
+
+static void dump_stack_element(lua_State *L, int i) {
+    char buf[32];
+
+    int top = lua_gettop(L);
+    int j = i - top - 1;
+    int t = lua_type(L, i);
+    switch (t) {
+        case LUA_TSTRING:
+            sprintf(buf, "%i (%i)  '%s'", i, j, lua_tostring(L, i));
+            break;
+        case LUA_TBOOLEAN:
+            sprintf(buf, "%i (%i)  %i", i, j, lua_toboolean(L, i) ? "true" : "false");
+            break;
+        case LUA_TNUMBER:
+            sprintf(buf, "%i (%i)  %g", i, j, lua_tonumber(L, i));
+            break;
+        default:
+            sprintf(buf, "%i (%i)  %s", i, j, lua_typename(L, t));
+            break;
+    }
+    sysout(buf);
+}
+
+static void dump_stack(lua_State *L) {
+    sysout("stack: [");
+    int top = lua_gettop(L);
+    for (int i = top; i > 0; i--) {
+        dump_stack_element(L, i);
+    }
+    sysout("]");
 }

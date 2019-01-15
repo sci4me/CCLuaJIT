@@ -1,5 +1,7 @@
 package com.sci.cclj;
 
+import com.sci.cclj.asm.CCLJClassTransformer;
+import com.sci.cclj.computer.LuaJITMachine;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
 
 import java.io.File;
@@ -9,7 +11,7 @@ import java.util.Map;
 @IFMLLoadingPlugin.MCVersion("1.7.10")
 @IFMLLoadingPlugin.TransformerExclusions({"com.sci.cclj"})
 public final class CCLuaJIT implements IFMLLoadingPlugin {
-    static File getModDirectory() {
+    public static File getModDirectory() {
         try {
             return new File(LuaJITMachine.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile();
         } catch(URISyntaxException e) {

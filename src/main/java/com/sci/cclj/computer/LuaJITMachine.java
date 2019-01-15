@@ -1,6 +1,7 @@
-package com.sci.cclj;
+package com.sci.cclj.computer;
 
-import dan200.computercraft.api.lua.LuaException;
+import com.sci.cclj.CCLuaJIT;
+import com.sci.cclj.util.OS;
 import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.lua.ILuaMachine;
 
@@ -33,7 +34,7 @@ public final class LuaJITMachine implements ILuaMachine {
     private static final Object specialEventsLock = new Object();
     private static final Set<String> specialEvents = new HashSet<>();
 
-    static void registerSpecialEvent(final String filter) {
+    public static void registerSpecialEvent(final String filter) {
         synchronized(LuaJITMachine.specialEventsLock) {
             LuaJITMachine.specialEvents.add(filter);
         }
@@ -47,7 +48,7 @@ public final class LuaJITMachine implements ILuaMachine {
 
     private final IComputer computer;
 
-    private final Map<String, Object[]> yieldResults; // @TODO: Change this to something like Map<String, List<Object[]>>
+    private final Map<String, Object[]> yieldResults; // @TODO: Change this to something like Map<String, List<Object[]>> ?
 
     private long luaState;
     private long mainRoutine;
@@ -100,7 +101,7 @@ public final class LuaJITMachine implements ILuaMachine {
     public void finalize() {
         synchronized(this) {
             System.out.println("LuaJITMachine finalize");
-            if(this.luaState != 0) this.destroyLuaState();
+            this.unload();
         }
     }
 
@@ -141,14 +142,16 @@ public final class LuaJITMachine implements ILuaMachine {
             if(eventName == null) {
                 arguments = new Object[0];
             } else if(args == null) {
-                arguments = new Object[] { eventName };
+                arguments = new Object[]{eventName};
             } else {
                 arguments = new Object[args.length + 1];
                 arguments[0] = eventName;
                 System.arraycopy(args, 0, arguments, 1, args.length);
             }
-    
+
             if(LuaJITMachine.isSpecialEvent(eventName)) {
+                if(this.yieldResults.containsKey(eventName))
+                    throw new RuntimeException("Duplicate event: " + eventName); // @TODO: remove this
                 this.yieldResults.put(eventName, arguments);
                 return;
             }
@@ -204,6 +207,6 @@ public final class LuaJITMachine implements ILuaMachine {
 
     @Override
     public void unload() {
-        if(this.mainRoutine != 0) this.destroyLuaState();
+        if(this.luaState != 0) this.destroyLuaState();
     }
 }

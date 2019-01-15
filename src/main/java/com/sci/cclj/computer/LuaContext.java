@@ -1,4 +1,4 @@
-package com.sci.cclj;
+package com.sci.cclj.computer;
 
 import dan200.computercraft.api.lua.*;
 
