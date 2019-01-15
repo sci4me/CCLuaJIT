@@ -112,10 +112,18 @@ public final class LuaContext implements ILuaContext {
         private final long id;
         private final ILuaTask task;
 
-        public ITaskInvocationHandler(final IComputer computer, final long id, final ILuaTask task) {
+        ITaskInvocationHandler(final IComputer computer, final long id, final ILuaTask task) {
             this.computer = computer;
             this.id = id;
             this.task = task;
+        }
+
+        private void respond(final boolean result, final Object... args) {
+            final Object[] arguments = new Object[args.length + 2];
+            arguments[0] = this.id;
+            arguments[1] = result;
+            System.arraycopy(args, 0, arguments, 2, args.length);
+            this.computer.queueEvent("task_complete", arguments);
         }
 
         @Override
@@ -127,24 +135,14 @@ public final class LuaContext implements ILuaContext {
                     try {
                         final Object[] results = this.task.execute();
                         if(results == null) {
-                            this.computer.queueEvent("task_complete", new Object[]{
-                                    this.id, true
-                            });
+                            this.respond(true);
                         } else {
-                            final Object[] eventArguments = new Object[results.length + 2];
-                            eventArguments[0] = this.id;
-                            eventArguments[1] = true;
-                            System.arraycopy(results, 0, eventArguments, 2, results.length);
-                            this.computer.queueEvent("task_complete", eventArguments);
+                            this.respond(true, results);
                         }
                     } catch(final LuaException e) {
-                        this.computer.queueEvent("task_complete", new Object[]{
-                                this.id, false, e.getMessage()
-                        });
+                        this.respond(false, e.getMessage());
                     } catch(final Throwable t) {
-                        this.computer.queueEvent("task_complete", new Object[]{
-                                this.id, false, String.format("Java Exception Thrown: %s", t.toString())
-                        });
+                        this.respond(false, String.format("Java Exception Thrown: %s", t.toString()));
                     }
                     return null;
                 default:

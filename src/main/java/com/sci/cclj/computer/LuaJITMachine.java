@@ -1,15 +1,15 @@
 package com.sci.cclj.computer;
 
+import com.google.common.collect.LinkedListMultimap;
 import com.sci.cclj.CCLuaJIT;
 import com.sci.cclj.util.OS;
 import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.lua.ILuaMachine;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class LuaJITMachine implements ILuaMachine {
     static {
@@ -48,7 +48,8 @@ public final class LuaJITMachine implements ILuaMachine {
 
     public final IComputer computer;
 
-    private final Map<String, Object[]> yieldResults; // @TODO: Change this to something like Map<String, List<Object[]>> ?
+    private final Object yieldResultsLock = new Object();
+    private final LinkedListMultimap<String, Object[]> yieldResults;
 
     private long luaState;
     private long mainRoutine;
@@ -60,7 +61,7 @@ public final class LuaJITMachine implements ILuaMachine {
     public LuaJITMachine(final IComputer computer) {
         this.computer = computer;
 
-        this.yieldResults = new ConcurrentHashMap<>();
+        this.yieldResults = LinkedListMultimap.create();
 
         if(!this.createLuaState()) {
             throw new RuntimeException("Failed to create native Lua state");
@@ -85,16 +86,17 @@ public final class LuaJITMachine implements ILuaMachine {
                 throw new RuntimeException("Attempt to call yield with an event filter that is not registered: '" + filter + "'");
             }
 
-            if(this.yieldResults.containsKey(filter)) {
-                final Object[] results = this.yieldResults.get(filter);
-                this.yieldResults.remove(filter);
-                return results;
+            while(true) {
+                // @TODO: this is a problem... we can't just spin here... we'll get "Too long without yielding"...
+                synchronized(this.yieldResultsLock) {
+                    if(this.yieldResults.containsKey(filter)) {
+                        return this.yieldResults.get(filter).remove(0);
+                    }
+                }
             }
         } else {
             throw new RuntimeException("Attempt to yield but no filter was provided!");
         }
-
-        return new Object[0];
     }
 
     @Override
@@ -150,9 +152,9 @@ public final class LuaJITMachine implements ILuaMachine {
             }
 
             if(LuaJITMachine.isSpecialEvent(eventName)) {
-                if(this.yieldResults.containsKey(eventName))
-                    throw new RuntimeException("Duplicate event: " + eventName); // @TODO: remove this
-                this.yieldResults.put(eventName, arguments);
+                synchronized(this.yieldResultsLock) {
+                    this.yieldResults.put(eventName, arguments);
+                }
                 return;
             }
 

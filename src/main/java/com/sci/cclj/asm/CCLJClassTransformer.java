@@ -25,7 +25,6 @@ public final class CCLJClassTransformer implements IClassTransformer {
     }
 
     private static final String COMPUTER_CLASS = "dan200.computercraft.core.computer.Computer";
-    private static final String TERMINAL_CLASS = "dan200.computercraft.core.terminal.Terminal";
     private static final String COMPUTER_DESC = "dan200/computercraft/core/computer/Computer";
     private static final String LUAJ_MACHINE_DESC = "dan200/computercraft/core/lua/LuaJLuaMachine";
     private static final String ILUACONTEXT_DESC = "dan200/computercraft/api/lua/ILuaContext";
