@@ -478,13 +478,44 @@ static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject machine
     map_to_table(env, L, map, vip, machine);
 }
 
-static jobject table_to_map(JNIEnv *env, lua_State *L, jobject objectsInProgress) {
-    // @TODO
+static jobject table_to_map(JNIEnv *env, lua_State *L, int objectsInProgress) {
+    int t = lua_gettop(L);
+
+    lua_pushvalue(L, t);
+    lua_gettable(L, objectsInProgress);
+    if(!lua_isnil(L, -1)) {
+        jobject oip = (jobject) lua_touserdata(L, -1);
+        lua_pop(L, 1);
+        return oip;
+    } else {
+        lua_pop(L, 1);
+    }
+
+    jobject map = env->NewObject(hashmap_class, hashmap_init_id);
+    lua_pushvalue(L, t);
+    lua_pushlightuserdata(L, map);
+    lua_settable(L, objectsInProgress);
+
+    lua_pushnil(L);
+    while(lua_next(L, t)) {
+        jobject value = to_java_value(env, L);
+        lua_pushvalue(L, -1);
+        jobject key = to_java_value(env, L);
+        env->CallObjectMethod(map, map_put_id, key, value);
+    }
+
+    lua_pop(L, 1);
+
+    return map;
 }
 
 static jobject table_to_map(JNIEnv *env, lua_State *L) {
-    jobject oip = env->NewObject(identityhashmap_class, identityhashmap_init_id);
-    return table_to_map(env, L, oip);
+    lua_newtable(L);
+    int oip = lua_gettop(L);
+    lua_pushvalue(L, -2);
+    jobject result = table_to_map(env, L, oip);
+    lua_pop(L, 2);
+    return result;
 }
 
 static void to_lua_value(JNIEnv *env, lua_State *L, jobject value, jobject machine) {
