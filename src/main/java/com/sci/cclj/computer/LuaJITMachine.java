@@ -46,7 +46,7 @@ public final class LuaJITMachine implements ILuaMachine {
         }
     }
 
-    private final IComputer computer;
+    public final IComputer computer;
 
     private final Map<String, Object[]> yieldResults; // @TODO: Change this to something like Map<String, List<Object[]>> ?
 
