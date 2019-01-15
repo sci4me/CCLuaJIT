@@ -255,6 +255,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
 }
 
+
 static int finalize_jobject_ref(lua_State *L) {
     jobject *obj = (jobject*) luaL_checkudata(L, 1, "jobject_ref");
     if(!obj) luaL_error(L, "Attempt to finalize finalized jobject_ref");
@@ -355,9 +356,9 @@ CCLJ_JNIEXPORT(jboolean, createLuaState) {
     luaopen_table(L);
     luaopen_bit(L);
 
-    lua_pop(L, lua_gettop(L));
-
     install_coroutine_create(env, L, obj);
+
+    lua_pop(L, lua_gettop(L));
 
     set_lua_state(env, obj, L);
 
@@ -406,9 +407,10 @@ CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
     if(err) return 0;
 
     new_jobject_ref(env, L, obj);
-    register_coroutine(L, -2, -1);
+    register_coroutine(L, 1, 2);
+    lua_sethook(main_routine, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
+
     lua_pop(L, 1);
-    lua_remove(L, -2);
 
     set_main_routine(env, obj, main_routine);
 
