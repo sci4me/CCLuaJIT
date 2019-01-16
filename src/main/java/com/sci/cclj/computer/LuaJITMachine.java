@@ -59,6 +59,8 @@ public final class LuaJITMachine implements ILuaMachine {
     private volatile String hardAbortMessage;
     private volatile String softAbortMessage;
 
+    private volatile boolean yieldRequested;
+
     public LuaJITMachine(final IComputer computer) {
         this.computer = computer;
 
@@ -88,7 +90,9 @@ public final class LuaJITMachine implements ILuaMachine {
             }
 
             while(true) {
-                if(this.yieldResults.containsKey(filter)) {
+                if(this.yieldResults.containsKey(filter) && !this.yieldRequested) {
+                    this.yieldRequested = true;
+                    this.computer.queueEvent(null, null);
                     return this.yieldResults.get(filter).remove(0);
                 }
 

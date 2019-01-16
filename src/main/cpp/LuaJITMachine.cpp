@@ -19,6 +19,8 @@ extern "C" {
 
 #define CCLJ_JNIEXPORT(rtype, name, ...) JNIEXPORT rtype JNICALL Java_com_sci_cclj_computer_LuaJITMachine_##name(JNIEnv *env, jobject obj, ##__VA_ARGS__)
 
+#define THREAD_INTERRUPT_HOOK_COUNT 100000
+
 static void sysout(const char *str);
 static void sysout(jobject obj);
 static void dump_stack_element(lua_State *L, int i);
@@ -93,6 +95,7 @@ static jfieldID lua_state_id = 0;
 static jfieldID main_routine_id = 0;
 static jfieldID soft_abort_message_id = 0;
 static jfieldID hard_abort_message_id = 0;
+static jfieldID yield_requested_id = 0;
 
 static jclass luacontext_class = 0;
 static jmethodID luacontext_init_id = 0;
@@ -205,7 +208,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J")) ||
         !(main_routine_id = env->GetFieldID(machine_class, "mainRoutine", "J")) ||
         !(soft_abort_message_id = env->GetFieldID(machine_class, "softAbortMessage", "Ljava/lang/String;")) ||
-        !(hard_abort_message_id = env->GetFieldID(machine_class, "hardAbortMessage", "Ljava/lang/String;"))) {
+        !(hard_abort_message_id = env->GetFieldID(machine_class, "hardAbortMessage", "Ljava/lang/String;")) ||
+        !(yield_requested_id = env->GetFieldID(machine_class, "yieldRequested", "Z"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -354,7 +358,7 @@ CCLJ_JNIEXPORT(jboolean, createLuaState) {
     luaopen_bit(L);
 
     install_coroutine_create(env, L, obj);
-    lua_sethook(L, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
+    lua_sethook(L, thread_interrupt_hook, LUA_MASKCOUNT, THREAD_INTERRUPT_HOOK_COUNT);
 
     lua_pop(L, lua_gettop(L));
 
@@ -642,6 +646,11 @@ static int try_abort(JNIEnv *env, jobject obj, lua_State *L) {
     return result;
 }
 
+static void thread_yield_request_handler_hook(lua_State *L, lua_Debug *ar) {
+    lua_sethook(L, thread_interrupt_hook, LUA_MASKCOUNT, THREAD_INTERRUPT_HOOK_COUNT);
+    lua_yield(L, 1);
+}
+
 static int invoke_java_fn(lua_State *L) {
     JNIEnv *env;
     if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
@@ -660,6 +669,11 @@ static int invoke_java_fn(lua_State *L) {
 
     jobjectArray arguments = to_java_values(env, L, lua_gettop(L));
     jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, luaContext, jfn->index, arguments);
+
+    if(env->GetBooleanField(machine, yield_requested_id)) {
+        env->SetBooleanField(machine, yield_requested_id, 0);
+        lua_sethook(L, thread_yield_request_handler_hook, LUA_MASKCOUNT, 1);
+    }
 
     if(results) {
         to_lua_values(env, L, results, jfn->machine);
