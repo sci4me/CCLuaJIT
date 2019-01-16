@@ -22,6 +22,12 @@ extern "C" {
 // Forward Declarations
 //
 
+typedef struct JavaFN {
+    jobject machine;
+    jobject obj;
+    int index;
+} JavaFN;
+
 static jclass get_class_global_ref(JNIEnv *env, const char *name);
 
 static int finalize_jobject_ref(lua_State *L);
@@ -377,12 +383,6 @@ static void thread_yield_request_handler_hook(lua_State *L, lua_Debug *ar) {
     lua_sethook(L, 0, 0, 0);
     lua_yield(L, 1);
 }
-
-typedef struct JavaFN {
-    jobject machine;
-    jobject obj;
-    int index;
-} JavaFN;
 
 static JavaFN* check_java_fn(lua_State *L) {
     JavaFN *jfn = (JavaFN*) luaL_checkudata(L, 1, "JavaFN");
