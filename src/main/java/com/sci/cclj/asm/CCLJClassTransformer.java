@@ -166,6 +166,7 @@ public final class CCLJClassTransformer implements IClassTransformer {
         list.add(new VarInsnNode(Opcodes.ALOAD, 1));
         list.add(new VarInsnNode(Opcodes.ALOAD, 2));
         list.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, ILUAMACHINE_DESC, "handleEvent", HANDLEEVENT_DESC));
+        list.add(new InsnNode(Opcodes.RETURN));
         list.add(label);
 
         mn.instructions.insertBefore(mn.instructions.get(mn.instructions.indexOf(insn) - 2), list);
