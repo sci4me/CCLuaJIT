@@ -134,6 +134,8 @@ static jmethodID get_names_id = 0;
 static JavaVM *jvm;
 static int initialized = 0;
 
+static const char REGISTRY_KEY_MACHINE = 'm';
+
 //
 // Main Code
 //
@@ -143,8 +145,6 @@ static jclass get_class_global_ref(JNIEnv *env, const char *name) {
     if(!clazz) return 0;
     return (jclass) env->NewGlobalRef((jobject) clazz);
 }
-
-static const char KEY_MACHINE = 'm';
 
 static int finalize_jobject_ref(lua_State *L) {
     jobject *obj = (jobject*) luaL_checkudata(L, 1, "jobject_ref");
@@ -177,7 +177,7 @@ static void new_jobject_ref(JNIEnv *env, lua_State *L, jobject obj) {
 static void thread_interrupt_hook(lua_State *L, lua_Debug *ar) {
     lua_sethook(L, 0, 0, 0);
 
-    lua_pushlightuserdata(L, (void*)&KEY_MACHINE);
+    lua_pushlightuserdata(L, (void*)&REGISTRY_KEY_MACHINE);
     lua_rawget(L, LUA_REGISTRYINDEX);
 
     jobject obj = *((jobject*) luaL_checkudata(L, -1, "jobject_ref"));
@@ -716,7 +716,7 @@ CCLJ_JNIEXPORT(jboolean, createLuaState) {
     luaopen_table(L);
     luaopen_bit(L);
 
-    lua_pushlightuserdata(L, (void*)&KEY_MACHINE);
+    lua_pushlightuserdata(L, (void*)&REGISTRY_KEY_MACHINE);
     new_jobject_ref(env, L, obj);
     lua_rawset(L, LUA_REGISTRYINDEX);
 
