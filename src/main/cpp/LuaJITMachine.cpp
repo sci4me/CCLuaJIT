@@ -321,10 +321,7 @@ static int coroutine_create(lua_State *L) {
     lua_State *t = lua_newthread(L);
     lua_pushvalue(L, -2);
     lua_xmove(L, t, 1);
-
     register_coroutine(L, lua_gettop(L), lua_upvalueindex(1));
-    lua_sethook(t, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
-
     return 1;
 }
 
@@ -357,6 +354,7 @@ CCLJ_JNIEXPORT(jboolean, createLuaState) {
     luaopen_bit(L);
 
     install_coroutine_create(env, L, obj);
+    lua_sethook(L, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
 
     lua_pop(L, lua_gettop(L));
 
@@ -408,7 +406,6 @@ CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
 
     new_jobject_ref(env, L, obj);
     register_coroutine(L, 1, 2);
-    lua_sethook(main_routine, thread_interrupt_hook, LUA_MASKCOUNT, 100000);
 
     lua_pop(L, 1);
 
