@@ -56,7 +56,7 @@ public final class LuaJITMachine implements ILuaMachine {
     private long mainRoutine;
 
     private String eventFilter;
-    private volatile String hardAbortMessage;
+    private volatile String hardAbortMessage; // @TODO: Do we really need to differentiate hard and soft any more?
     private volatile String softAbortMessage;
 
     private volatile boolean yieldRequested;
@@ -81,7 +81,7 @@ public final class LuaJITMachine implements ILuaMachine {
 
     private native Object[] resumeMainRoutine(final Object[] arguments) throws InterruptedException;
 
-    private native void abort();
+    private native void abort(); // @TODO: Can we just pass the string to this function to avoid needing REGISTER_KEY_MACHINE in LUA_REGISTRYINDEX
 
     public Object[] yield(final Object[] arguments) {
         if(arguments.length > 0 && arguments[0] instanceof String) {

@@ -104,6 +104,8 @@ public final class LuaContext implements ILuaContext {
     }
 
     private static final class ITaskInvocationHandler implements InvocationHandler {
+        // @TODO: Instead of using Proxy, generate this class with ASM (implements ITask)
+
         static {
             LuaJITMachine.registerSpecialEvent("task_complete");
         }
