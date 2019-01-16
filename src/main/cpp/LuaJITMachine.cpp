@@ -16,32 +16,50 @@ extern "C" {
 */
 
 #define CCLJ_JNIVERSION JNI_VERSION_1_6
-
 #define CCLJ_JNIEXPORT(rtype, name, ...) JNIEXPORT rtype JNICALL Java_com_sci_cclj_computer_LuaJITMachine_##name(JNIEnv *env, jobject obj, ##__VA_ARGS__)
 
-#define THREAD_INTERRUPT_HOOK_COUNT 100000
+//
+// Forward Declarations
+//
 
-static void sysout(const char *str);
-static void sysout(jobject obj);
-static void dump_stack_element(lua_State *L, int i);
-static void dump_stack(lua_State *L);
+static jclass get_class_global_ref(JNIEnv *env, const char *name);
 
-static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress);
-static void map_to_table(JNIEnv *env, lua_State *L, jobject map);
-static jobject table_to_map(JNIEnv *env, lua_State *L, jobject objectsInProgress);
+static int finalize_jobject_ref(lua_State *L);
+static void new_jobject_ref(JNIEnv *env, lua_State *L, jobject obj);
+
+static void thread_interrupt_hook(lua_State *L, lua_Debug *ar);
+
+static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress, jobject machine);
+static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject machine);
+static jobject table_to_map(JNIEnv *env, lua_State *L, int objectsInProgress);
 static jobject table_to_map(JNIEnv *env, lua_State *L);
-
 static void to_lua_value(JNIEnv *env, lua_State *L, jobject value, jobject machine);
 static void to_lua_values(JNIEnv *env, lua_State *L, jobjectArray values, jobject machine);
 static jobject to_java_value(JNIEnv *env, lua_State *L);
 static jobjectArray to_java_values(JNIEnv *env, lua_State *L, int n);
 
+int try_abort(JNIEnv *env, jobject obj, lua_State *L);
+static void thread_yield_request_handler_hook(lua_State *L, lua_Debug *ar);
+
+static JavaFN* check_java_fn(lua_State *L);
+static int invoke_java_fn(lua_State *L);
+static int finalize_java_fn(lua_State *L);
+static void new_java_fn(JNIEnv *env, lua_State *L, jobject obj, int index, jobject machine);
 static int wrap_lua_object(JNIEnv *env, lua_State *L, jobject obj, jobject machine);
 
-static lua_State* get_lua_state(JNIEnv *env, jobject obj);
-static void set_lua_state(JNIEnv *env, jobject obj, lua_State *L);
-static lua_State* get_main_routine(JNIEnv *env, jobject obj);
-static void set_main_routine(JNIEnv *env, jobject obj, lua_State *L);
+lua_State *get_lua_state(JNIEnv *env, jobject obj);
+void set_lua_state(JNIEnv *env, jobject obj, lua_State *L);
+lua_State *get_main_routine(JNIEnv *env, jobject obj);
+void set_main_routine(JNIEnv *env, jobject obj, lua_State *L);
+
+void sysout(jobject obj);
+void sysout(const char *str);
+static void dump_stack_element(lua_State *L, int i);
+static void dump_stack(lua_State *L);
+
+//
+// Variables
+//
 
 static jclass object_class = 0;
 
@@ -110,9 +128,9 @@ static jmethodID get_names_id = 0;
 static JavaVM *jvm;
 static int initialized = 0;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//
+// Main Code
+//
 
 static jclass get_class_global_ref(JNIEnv *env, const char *name) {
     jclass clazz = env->FindClass(name);
@@ -120,145 +138,7 @@ static jclass get_class_global_ref(JNIEnv *env, const char *name) {
     return (jclass) env->NewGlobalRef((jobject) clazz);
 }
 
-JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
-    jvm = vm;
-
-
-	JNIEnv *env;
-	if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
-		return CCLJ_JNIVERSION;
-	}
-
-    if(!(object_class = get_class_global_ref(env, "java/lang/Object"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(number_class = get_class_global_ref(env, "java/lang/Number")) ||
-        !(doublevalue_id = env->GetMethodID(number_class, "doubleValue", "()D")) ||
-        !(intvalue_id = env->GetMethodID(number_class, "intValue", "()I"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(integer_class = get_class_global_ref(env, "java/lang/Integer")) ||
-        !(integer_valueof_id = env->GetStaticMethodID(integer_class, "valueOf", "(I)Ljava/lang/Integer;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(double_class = get_class_global_ref(env, "java/lang/Double")) ||
-        !(double_valueof_id = env->GetStaticMethodID(double_class, "valueOf", "(D)Ljava/lang/Double;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(boolean_class = get_class_global_ref(env, "java/lang/Boolean")) ||
-        !(boolean_valueof_id = env->GetStaticMethodID(boolean_class, "valueOf", "(Z)Ljava/lang/Boolean;")) ||
-        !(booleanvalue_id = env->GetMethodID(boolean_class, "booleanValue", "()Z")) ||
-        !(boolean_false = env->NewGlobalRef(env->GetStaticObjectField(boolean_class, env->GetStaticFieldID(boolean_class, "FALSE", "Ljava/lang/Boolean;"))))) {
-        return CCLJ_JNIVERSION;
-    }    
-
-    if(!(string_class = get_class_global_ref(env, "java/lang/String"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(bytearray_class = get_class_global_ref(env, "[B"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(map_class = get_class_global_ref(env, "java/util/Map")) ||
-        !(map_containskey_id = env->GetMethodID(map_class, "containsKey", "(Ljava/lang/Object;)Z")) ||
-        !(map_get_id = env->GetMethodID(map_class, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")) ||
-        !(map_put_id = env->GetMethodID(map_class, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")) ||
-        !(map_entryset_id = env->GetMethodID(map_class, "entrySet", "()Ljava/util/Set;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(map_entry_class = get_class_global_ref(env, "java/util/Map$Entry")) ||
-        !(map_entry_getkey_id = env->GetMethodID(map_entry_class, "getKey", "()Ljava/lang/Object;")) ||
-        !(map_entry_getvalue_id = env->GetMethodID(map_entry_class, "getValue", "()Ljava/lang/Object;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(hashmap_class = get_class_global_ref(env, "java/util/HashMap")) ||
-        !(hashmap_init_id = env->GetMethodID(hashmap_class, "<init>", "()V"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(set_class = get_class_global_ref(env, "java/util/Set")) ||
-        !(set_iterator_id = env->GetMethodID(set_class, "iterator", "()Ljava/util/Iterator;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(iterator_class = get_class_global_ref(env, "java/util/Iterator")) ||
-        !(iterator_hasnext_id = env->GetMethodID(iterator_class, "hasNext", "()Z")) ||
-        !(iterator_next_id = env->GetMethodID(iterator_class, "next", "()Ljava/lang/Object;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(identityhashmap_class = get_class_global_ref(env, "java/util/IdentityHashMap")) ||
-        !(identityhashmap_init_id = env->GetMethodID(identityhashmap_class, "<init>", "()V"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(interruptedexception_class = get_class_global_ref(env, "java/lang/InterruptedException")) ||
-        !(interruptedexception_init_id = env->GetMethodID(interruptedexception_class, "<init>", "(Ljava/lang/String;)V"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(machine_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaJITMachine")) ||
-        !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J")) ||
-        !(main_routine_id = env->GetFieldID(machine_class, "mainRoutine", "J")) ||
-        !(soft_abort_message_id = env->GetFieldID(machine_class, "softAbortMessage", "Ljava/lang/String;")) ||
-        !(hard_abort_message_id = env->GetFieldID(machine_class, "hardAbortMessage", "Ljava/lang/String;")) ||
-        !(yield_requested_id = env->GetFieldID(machine_class, "yieldRequested", "Z"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaContext")) ||
-        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "(Lcom/sci/cclj/computer/LuaJITMachine;)V"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(iluaapi_class = get_class_global_ref(env, "dan200/computercraft/core/apis/ILuaAPI")) ||
-        !(get_names_id = env->GetMethodID(iluaapi_class, "getNames", "()[Ljava/lang/String;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    if(!(iluaobject_class = get_class_global_ref(env, "dan200/computercraft/api/lua/ILuaObject")) ||
-        !(get_method_names_id = env->GetMethodID(iluaobject_class, "getMethodNames", "()[Ljava/lang/String;")) ||
-        !(call_method_id = env->GetMethodID(iluaobject_class, "callMethod", "(Ldan200/computercraft/api/lua/ILuaContext;I[Ljava/lang/Object;)[Ljava/lang/Object;"))) {
-        return CCLJ_JNIVERSION;
-    }
-
-    initialized = 1;
-	return CCLJ_JNIVERSION;
-}
-
-JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
-    JNIEnv *env;
-    if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        return;
-    }
-
-    if(object_class)                    env->DeleteGlobalRef(object_class);
-    if(number_class)                    env->DeleteGlobalRef(number_class);
-    if(integer_class)                   env->DeleteGlobalRef(integer_class);
-    if(double_class)                    env->DeleteGlobalRef(double_class);
-    if(boolean_class)                   env->DeleteGlobalRef(boolean_class);
-    if(boolean_false)                   env->DeleteGlobalRef(boolean_false);
-    if(string_class)                    env->DeleteGlobalRef(string_class);
-    if(bytearray_class)                 env->DeleteGlobalRef(bytearray_class);
-    if(map_class)                       env->DeleteGlobalRef(map_class);
-    if(hashmap_class)                   env->DeleteGlobalRef(hashmap_class);
-    if(set_class)                       env->DeleteGlobalRef(set_class);
-    if(iterator_class)                  env->DeleteGlobalRef(iterator_class);
-    if(identityhashmap_class)           env->DeleteGlobalRef(identityhashmap_class);
-    if(interruptedexception_class)      env->DeleteGlobalRef(interruptedexception_class);
-    if(machine_class)                   env->DeleteGlobalRef(machine_class);
-    if(luacontext_class)                env->DeleteGlobalRef(luacontext_class);
-    if(iluaapi_class)                   env->DeleteGlobalRef(iluaapi_class);
-    if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
-}
-
+static const char KEY_MACHINE = 'm';
 
 static int finalize_jobject_ref(lua_State *L) {
     jobject *obj = (jobject*) luaL_checkudata(L, 1, "jobject_ref");
@@ -271,7 +151,7 @@ static int finalize_jobject_ref(lua_State *L) {
     }
 
     env->DeleteGlobalRef(*obj);
-    *obj = 0;    
+    *obj = 0;
     return 0;
 }
 
@@ -288,13 +168,11 @@ static void new_jobject_ref(JNIEnv *env, lua_State *L, jobject obj) {
     lua_setmetatable(L, -2);
 }
 
-static const char KEY_HOOK = 'h';
-
 static void thread_interrupt_hook(lua_State *L, lua_Debug *ar) {
-    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
+    lua_sethook(L, 0, 0, 0);
+
+    lua_pushlightuserdata(L, (void*)&KEY_MACHINE);
     lua_rawget(L, LUA_REGISTRYINDEX);
-    lua_pushthread(L);
-    lua_gettable(L, -2);
 
     jobject obj = *((jobject*) luaL_checkudata(L, -1, "jobject_ref"));
     lua_pop(L, 1);
@@ -305,147 +183,8 @@ static void thread_interrupt_hook(lua_State *L, lua_Debug *ar) {
         return;
     }
 
-    jstring hardAbortMessage = (jstring) env->GetObjectField(obj, hard_abort_message_id);
-    if(hardAbortMessage) {
-        lua_pushnil(L);
-        lua_yield(L, 1);
-    }
+    try_abort(env, obj, L);
 }
-
-static void register_coroutine(lua_State *L, int ti, int ui) {
-    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
-    lua_rawget(L, LUA_REGISTRYINDEX);
-    lua_pushvalue(L, ti);
-    lua_pushvalue(L, ui);
-    lua_settable(L, -3);
-    lua_pop(L, 1);
-}
-
-static int coroutine_create(lua_State *L) {
-    lua_State *t = lua_newthread(L);
-    lua_pushvalue(L, -2);
-    lua_xmove(L, t, 1);
-    register_coroutine(L, lua_gettop(L), lua_upvalueindex(1));
-    return 1;
-}
-
-static void install_coroutine_create(JNIEnv *env, lua_State *L, jobject obj) {
-    lua_pushlightuserdata(L, (void*)&KEY_HOOK);
-    lua_newtable(L);
-    lua_newtable(L);
-    lua_pushstring(L, "__mode");
-    lua_pushstring(L, "k");
-    lua_settable(L, -3);
-    lua_setmetatable(L, -2);
-    lua_rawset(L, LUA_REGISTRYINDEX);
-
-    lua_getglobal(L, "coroutine");
-    new_jobject_ref(env, L, obj);
-    lua_pushcclosure(L, coroutine_create, 1);
-    lua_setfield(L, -2, "create");
-}
-
-CCLJ_JNIEXPORT(jboolean, createLuaState) {
-    if(!initialized) return 0;
-
-    lua_State *L = luaL_newstate();
-    if(!L) return 0;
-
-    luaopen_base(L);
-    luaopen_math(L);
-    luaopen_string(L);
-    luaopen_table(L);
-    luaopen_bit(L);
-
-    install_coroutine_create(env, L, obj);
-    lua_sethook(L, thread_interrupt_hook, LUA_MASKCOUNT, THREAD_INTERRUPT_HOOK_COUNT);
-
-    lua_pop(L, lua_gettop(L));
-
-    set_lua_state(env, obj, L);
-
-    return 1;
-}
-
-CCLJ_JNIEXPORT(void, destroyLuaState) {
-    lua_State *L = get_lua_state(env, obj);
-
-    lua_close(L);
-
-    set_lua_state(env, obj, 0);
-    set_main_routine(env, obj, 0);
-}
-
-CCLJ_JNIEXPORT(jboolean, registerAPI, jobject api) {
-    lua_State *L = get_lua_state(env, obj);
-
-    int table = wrap_lua_object(env, L, api, obj);    
-
-    jobjectArray names = (jobjectArray) env->CallObjectMethod(api, get_names_id);
-    jsize len = env->GetArrayLength(names);
-    for(jsize i = 0; i < len; i++) {
-        jstring name = (jstring) env->GetObjectArrayElement(names, i);
-        const char *namec = env->GetStringUTFChars(name, JNI_FALSE);
-        lua_pushvalue(L, table);
-        lua_setglobal(L, namec);
-        env->ReleaseStringUTFChars(name, namec);
-        env->DeleteLocalRef(name);
-    }
-
-    lua_remove(L, table);
-
-    return 1;
-}
-
-CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
-    lua_State *L = get_lua_state(env, obj);
-
-    lua_State *main_routine = lua_newthread(L);
-    if(!main_routine) return 0;
-
-    const char *biosc = env->GetStringUTFChars(bios, JNI_FALSE);
-    int err = luaL_loadbuffer(main_routine, biosc, strlen(biosc), "bios.lua");
-    env->ReleaseStringUTFChars(bios, biosc);
-    if(err) return 0;
-
-    new_jobject_ref(env, L, obj);
-    register_coroutine(L, 1, 2);
-
-    lua_pop(L, 1);
-
-    set_main_routine(env, obj, main_routine);
-
-    return lua_isthread(L, -1);
-}
-
-CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
-    lua_State *L = get_main_routine(env, obj);
-
-    int before = lua_gettop(L);
-    to_lua_values(env, L, args, obj);
-    int stat = lua_resume(L, env->GetArrayLength(args));
-    int after = lua_gettop(L);
-
-    jobjectArray results;
-    if(stat == LUA_YIELD || stat == 0) {
-        int nresults = after - before;
-        if(nresults > 0) {
-            results = to_java_values(env, L, nresults);
-        } else {
-            results = env->NewObjectArray(0, object_class, 0);
-        }
-    } else {
-        results = env->NewObjectArray(2, object_class, 0);
-        env->SetObjectArrayElement(results, 0, boolean_false);
-        env->SetObjectArrayElement(results, 1, to_java_value(env, L));
-    }
-
-    return results;
-}
-
-#ifdef __cplusplus
-}
-#endif
 
 static void map_to_table(JNIEnv *env, lua_State *L, jobject map, jobject valuesInProgress, jobject machine) {
     if(env->CallBooleanMethod(valuesInProgress, map_containskey_id, map)) {
@@ -616,19 +355,7 @@ static jobjectArray to_java_values(JNIEnv *env, lua_State *L, int n) {
     return result;
 }
 
-typedef struct JavaFN {
-    jobject machine;
-    jobject obj;
-    int index;
-} JavaFN;
-
-static JavaFN* check_java_fn(lua_State *L) {
-    JavaFN *jfn = (JavaFN*) luaL_checkudata(L, 1, "JavaFN");
-    if(!jfn->obj) luaL_error(L, "Attempt to access finalized JavaFN");
-    return jfn;
-}
-
-static int try_abort(JNIEnv *env, jobject obj, lua_State *L) {
+int try_abort(JNIEnv *env, jobject obj, lua_State *L) {
     int result = 0;
     jstring softAbortMessage = (jstring) env->GetObjectField(obj, soft_abort_message_id);
     if(softAbortMessage) {
@@ -647,8 +374,20 @@ static int try_abort(JNIEnv *env, jobject obj, lua_State *L) {
 }
 
 static void thread_yield_request_handler_hook(lua_State *L, lua_Debug *ar) {
-    lua_sethook(L, thread_interrupt_hook, LUA_MASKCOUNT, THREAD_INTERRUPT_HOOK_COUNT);
+    lua_sethook(L, 0, 0, 0);
     lua_yield(L, 1);
+}
+
+typedef struct JavaFN {
+    jobject machine;
+    jobject obj;
+    int index;
+} JavaFN;
+
+static JavaFN* check_java_fn(lua_State *L) {
+    JavaFN *jfn = (JavaFN*) luaL_checkudata(L, 1, "JavaFN");
+    if(!jfn->obj) luaL_error(L, "Attempt to access finalized JavaFN");
+    return jfn;
 }
 
 static int invoke_java_fn(lua_State *L) {
@@ -818,3 +557,252 @@ static void dump_stack(lua_State *L) {
     }
     sysout("]");
 }
+
+//
+// JNI Code
+//
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
+    jvm = vm;
+
+	JNIEnv *env;
+	if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
+		return CCLJ_JNIVERSION;
+	}
+
+    if(!(object_class = get_class_global_ref(env, "java/lang/Object"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(number_class = get_class_global_ref(env, "java/lang/Number")) ||
+        !(doublevalue_id = env->GetMethodID(number_class, "doubleValue", "()D")) ||
+        !(intvalue_id = env->GetMethodID(number_class, "intValue", "()I"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(integer_class = get_class_global_ref(env, "java/lang/Integer")) ||
+        !(integer_valueof_id = env->GetStaticMethodID(integer_class, "valueOf", "(I)Ljava/lang/Integer;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(double_class = get_class_global_ref(env, "java/lang/Double")) ||
+        !(double_valueof_id = env->GetStaticMethodID(double_class, "valueOf", "(D)Ljava/lang/Double;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(boolean_class = get_class_global_ref(env, "java/lang/Boolean")) ||
+        !(boolean_valueof_id = env->GetStaticMethodID(boolean_class, "valueOf", "(Z)Ljava/lang/Boolean;")) ||
+        !(booleanvalue_id = env->GetMethodID(boolean_class, "booleanValue", "()Z")) ||
+        !(boolean_false = env->NewGlobalRef(env->GetStaticObjectField(boolean_class, env->GetStaticFieldID(boolean_class, "FALSE", "Ljava/lang/Boolean;"))))) {
+        return CCLJ_JNIVERSION;
+    }    
+
+    if(!(string_class = get_class_global_ref(env, "java/lang/String"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(bytearray_class = get_class_global_ref(env, "[B"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(map_class = get_class_global_ref(env, "java/util/Map")) ||
+        !(map_containskey_id = env->GetMethodID(map_class, "containsKey", "(Ljava/lang/Object;)Z")) ||
+        !(map_get_id = env->GetMethodID(map_class, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")) ||
+        !(map_put_id = env->GetMethodID(map_class, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")) ||
+        !(map_entryset_id = env->GetMethodID(map_class, "entrySet", "()Ljava/util/Set;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(map_entry_class = get_class_global_ref(env, "java/util/Map$Entry")) ||
+        !(map_entry_getkey_id = env->GetMethodID(map_entry_class, "getKey", "()Ljava/lang/Object;")) ||
+        !(map_entry_getvalue_id = env->GetMethodID(map_entry_class, "getValue", "()Ljava/lang/Object;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(hashmap_class = get_class_global_ref(env, "java/util/HashMap")) ||
+        !(hashmap_init_id = env->GetMethodID(hashmap_class, "<init>", "()V"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(set_class = get_class_global_ref(env, "java/util/Set")) ||
+        !(set_iterator_id = env->GetMethodID(set_class, "iterator", "()Ljava/util/Iterator;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(iterator_class = get_class_global_ref(env, "java/util/Iterator")) ||
+        !(iterator_hasnext_id = env->GetMethodID(iterator_class, "hasNext", "()Z")) ||
+        !(iterator_next_id = env->GetMethodID(iterator_class, "next", "()Ljava/lang/Object;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(identityhashmap_class = get_class_global_ref(env, "java/util/IdentityHashMap")) ||
+        !(identityhashmap_init_id = env->GetMethodID(identityhashmap_class, "<init>", "()V"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(interruptedexception_class = get_class_global_ref(env, "java/lang/InterruptedException")) ||
+        !(interruptedexception_init_id = env->GetMethodID(interruptedexception_class, "<init>", "(Ljava/lang/String;)V"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(machine_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaJITMachine")) ||
+        !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J")) ||
+        !(main_routine_id = env->GetFieldID(machine_class, "mainRoutine", "J")) ||
+        !(soft_abort_message_id = env->GetFieldID(machine_class, "softAbortMessage", "Ljava/lang/String;")) ||
+        !(hard_abort_message_id = env->GetFieldID(machine_class, "hardAbortMessage", "Ljava/lang/String;")) ||
+        !(yield_requested_id = env->GetFieldID(machine_class, "yieldRequested", "Z"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaContext")) ||
+        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "(Lcom/sci/cclj/computer/LuaJITMachine;)V"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(iluaapi_class = get_class_global_ref(env, "dan200/computercraft/core/apis/ILuaAPI")) ||
+        !(get_names_id = env->GetMethodID(iluaapi_class, "getNames", "()[Ljava/lang/String;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    if(!(iluaobject_class = get_class_global_ref(env, "dan200/computercraft/api/lua/ILuaObject")) ||
+        !(get_method_names_id = env->GetMethodID(iluaobject_class, "getMethodNames", "()[Ljava/lang/String;")) ||
+        !(call_method_id = env->GetMethodID(iluaobject_class, "callMethod", "(Ldan200/computercraft/api/lua/ILuaContext;I[Ljava/lang/Object;)[Ljava/lang/Object;"))) {
+        return CCLJ_JNIVERSION;
+    }
+
+    initialized = 1;
+	return CCLJ_JNIVERSION;
+}
+
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
+    JNIEnv *env;
+    if (vm->GetEnv((void **) &env, CCLJ_JNIVERSION) != JNI_OK) {
+        return;
+    }
+
+    if(object_class)                    env->DeleteGlobalRef(object_class);
+    if(number_class)                    env->DeleteGlobalRef(number_class);
+    if(integer_class)                   env->DeleteGlobalRef(integer_class);
+    if(double_class)                    env->DeleteGlobalRef(double_class);
+    if(boolean_class)                   env->DeleteGlobalRef(boolean_class);
+    if(boolean_false)                   env->DeleteGlobalRef(boolean_false);
+    if(string_class)                    env->DeleteGlobalRef(string_class);
+    if(bytearray_class)                 env->DeleteGlobalRef(bytearray_class);
+    if(map_class)                       env->DeleteGlobalRef(map_class);
+    if(hashmap_class)                   env->DeleteGlobalRef(hashmap_class);
+    if(set_class)                       env->DeleteGlobalRef(set_class);
+    if(iterator_class)                  env->DeleteGlobalRef(iterator_class);
+    if(identityhashmap_class)           env->DeleteGlobalRef(identityhashmap_class);
+    if(interruptedexception_class)      env->DeleteGlobalRef(interruptedexception_class);
+    if(machine_class)                   env->DeleteGlobalRef(machine_class);
+    if(luacontext_class)                env->DeleteGlobalRef(luacontext_class);
+    if(iluaapi_class)                   env->DeleteGlobalRef(iluaapi_class);
+    if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
+}
+
+CCLJ_JNIEXPORT(jboolean, createLuaState) {
+    if(!initialized) return 0;
+
+    lua_State *L = luaL_newstate();
+    if(!L) return 0;
+
+    luaopen_base(L);
+    luaopen_math(L);
+    luaopen_string(L);
+    luaopen_table(L);
+    luaopen_bit(L);
+
+    lua_pushlightuserdata(L, (void*)&KEY_MACHINE);
+    new_jobject_ref(env, L, obj);
+    lua_rawset(L, LUA_REGISTRYINDEX);
+
+    lua_pop(L, lua_gettop(L));
+
+    set_lua_state(env, obj, L);
+
+    return 1;
+}
+
+CCLJ_JNIEXPORT(void, destroyLuaState) {
+    lua_State *L = get_lua_state(env, obj);
+
+    lua_close(L);
+
+    set_lua_state(env, obj, 0);
+    set_main_routine(env, obj, 0);
+}
+
+CCLJ_JNIEXPORT(jboolean, registerAPI, jobject api) {
+    lua_State *L = get_lua_state(env, obj);
+
+    int table = wrap_lua_object(env, L, api, obj);    
+
+    jobjectArray names = (jobjectArray) env->CallObjectMethod(api, get_names_id);
+    jsize len = env->GetArrayLength(names);
+    for(jsize i = 0; i < len; i++) {
+        jstring name = (jstring) env->GetObjectArrayElement(names, i);
+        const char *namec = env->GetStringUTFChars(name, JNI_FALSE);
+        lua_pushvalue(L, table);
+        lua_setglobal(L, namec);
+        env->ReleaseStringUTFChars(name, namec);
+        env->DeleteLocalRef(name);
+    }
+
+    lua_remove(L, table);
+
+    return 1;
+}
+
+CCLJ_JNIEXPORT(jboolean, loadBios, jstring bios) {
+    lua_State *L = get_lua_state(env, obj);
+
+    lua_State *main_routine = lua_newthread(L);
+    if(!main_routine) return 0;
+
+    const char *biosc = env->GetStringUTFChars(bios, JNI_FALSE);
+    int err = luaL_loadbuffer(main_routine, biosc, strlen(biosc), "bios.lua");
+    env->ReleaseStringUTFChars(bios, biosc);
+    if(err) return 0;
+
+    set_main_routine(env, obj, main_routine);
+
+    return lua_isthread(L, -1);
+}
+
+CCLJ_JNIEXPORT(jobjectArray, resumeMainRoutine, jobjectArray args) {
+    lua_State *L = get_main_routine(env, obj);
+
+    int before = lua_gettop(L);
+    to_lua_values(env, L, args, obj);
+    int stat = lua_resume(L, env->GetArrayLength(args));
+    int after = lua_gettop(L);
+
+    jobjectArray results;
+    if(stat == LUA_YIELD || stat == 0) {
+        int nresults = after - before;
+        if(nresults > 0) {
+            results = to_java_values(env, L, nresults);
+        } else {
+            results = env->NewObjectArray(0, object_class, 0);
+        }
+    } else {
+        results = env->NewObjectArray(2, object_class, 0);
+        env->SetObjectArrayElement(results, 0, boolean_false);
+        env->SetObjectArrayElement(results, 1, to_java_value(env, L));
+    }
+
+    return results;
+}
+
+CCLJ_JNIEXPORT(void, abort) {
+    lua_State *L = get_main_routine(env, obj);
+    lua_sethook(L, thread_interrupt_hook, LUA_MASKCOUNT, 1);
+}
+
+#ifdef __cplusplus
+}
+#endif

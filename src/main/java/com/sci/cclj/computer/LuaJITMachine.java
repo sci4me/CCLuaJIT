@@ -81,6 +81,8 @@ public final class LuaJITMachine implements ILuaMachine {
 
     private native Object[] resumeMainRoutine(final Object[] arguments) throws InterruptedException;
 
+    private native void abort();
+
     public Object[] yield(final Object[] arguments) {
         if(arguments.length > 0 && arguments[0] instanceof String) {
             final String filter = (String) arguments[0];
@@ -194,6 +196,8 @@ public final class LuaJITMachine implements ILuaMachine {
     private void abort(final boolean hard, final String abortMessage) {
         this.softAbortMessage = abortMessage;
         if(hard) this.hardAbortMessage = abortMessage;
+
+        this.abort();
     }
 
     @Override
