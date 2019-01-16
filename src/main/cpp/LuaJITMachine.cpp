@@ -381,7 +381,7 @@ int try_abort(JNIEnv *env, jobject obj, lua_State *L) {
 
 static void thread_yield_request_handler_hook(lua_State *L, lua_Debug *ar) {
     lua_sethook(L, 0, 0, 0);
-    lua_yield(L, 1);
+    lua_yield(L, 0);
 }
 
 static JavaFN* check_java_fn(lua_State *L) {
