@@ -108,7 +108,6 @@ public final class LuaJITMachine implements ILuaMachine {
     @Override
     public void finalize() {
         synchronized(this) {
-            System.out.println("LuaJITMachine finalize");
             this.unload();
         }
     }
@@ -188,15 +187,19 @@ public final class LuaJITMachine implements ILuaMachine {
         }
     }
 
+    private void abort(final boolean hard, final String abortMessage) {
+        this.softAbortMessage = abortMessage;
+        if(hard) this.hardAbortMessage = abortMessage;
+    }
+
     @Override
     public void softAbort(final String abortMessage) {
-        this.softAbortMessage = abortMessage;
+        this.abort(false, abortMessage);
     }
 
     @Override
     public void hardAbort(final String abortMessage) {
-        this.softAbortMessage = abortMessage;
-        this.hardAbortMessage = abortMessage;
+        this.abort(true, abortMessage);
     }
 
     @Override
