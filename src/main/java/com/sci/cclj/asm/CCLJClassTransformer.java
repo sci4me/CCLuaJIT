@@ -11,8 +11,7 @@ import java.util.*;
 
 import static com.sci.cclj.asm.Constants.*;
 
-// @TODO: Modify OSAPI queueEvent to prepend a sentinel object to arguments in case event filter is a special event
-// @TODO: Once we're transforming >1 class, use a Set<String> to check if class 'name' is being transformed
+// @TODO: Modify OSAPI queueEvent to prepend a sentinel object to arguments in case event filter is a special event?
 
 public final class CCLJClassTransformer implements IClassTransformer {
     private final Set<String> exclusions;
