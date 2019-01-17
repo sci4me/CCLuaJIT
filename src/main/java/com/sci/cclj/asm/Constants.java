@@ -10,7 +10,7 @@ public final class Constants {
 
     public static final String LUACONTEXT_CLASS = "com.sci.cclj.computer.LuaContext";
     public static final String CCLJ_MACHINE_DESC = "com/sci/cclj/computer/LuaJITMachine";
-    public static final String TASKEXECUTOR_DESC = "com/sci/cclj/computer/TaskExecutor";
+    public static final String TASKSCHEDULER_DESC = "com/sci/cclj/computer/TaskScheduler";
 
     public static final String COMPUTERTHREAD_QUEUETASK_DESC = "(Ldan200/computercraft/core/computer/ITask;Ldan200/computercraft/core/computer/Computer;)V";
     public static final String HANDLEEVENT_DESC = "(Ljava/lang/String;[Ljava/lang/Object;)V";

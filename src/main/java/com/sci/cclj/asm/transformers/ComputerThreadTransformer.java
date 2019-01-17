@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.sci.cclj.asm.Constants.COMPUTERTHREAD_CLASS;
-import static com.sci.cclj.asm.Constants.TASKEXECUTOR_DESC;
+import static com.sci.cclj.asm.Constants.TASKSCHEDULER_DESC;
 
 public final class ComputerThreadTransformer implements ITransformer {
     @Override
@@ -46,7 +46,7 @@ public final class ComputerThreadTransformer implements ITransformer {
                     mn.localVariables.clear();
                     mn.tryCatchBlocks.clear();
 
-                    mn.instructions.add(new FieldInsnNode(Opcodes.GETSTATIC, TASKEXECUTOR_DESC, "INSTANCE", String.format("L%s;", TASKEXECUTOR_DESC)));
+                    mn.instructions.add(new FieldInsnNode(Opcodes.GETSTATIC, TASKSCHEDULER_DESC, "INSTANCE", String.format("L%s;", TASKSCHEDULER_DESC)));
 
                     if(mn.name.equals("queueTask")) {
                         mn.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
@@ -55,7 +55,7 @@ public final class ComputerThreadTransformer implements ITransformer {
                         mn.maxStack = 3;
                     }
 
-                    mn.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, TASKEXECUTOR_DESC, mn.name, mn.desc, false));
+                    mn.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, TASKSCHEDULER_DESC, mn.name, mn.desc, false));
                     mn.instructions.add(new InsnNode(Opcodes.RETURN));
                     break;
                 default:

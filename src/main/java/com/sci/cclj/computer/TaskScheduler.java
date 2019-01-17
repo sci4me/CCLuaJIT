@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.WeakHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public final class TaskExecutor {
-    public static final TaskExecutor INSTANCE = new TaskExecutor();
+public final class TaskScheduler {
+    public static final TaskScheduler INSTANCE = new TaskScheduler();
 
     private final Object mainLock = new Object();
     private final Object defaultQueue = new Object();
@@ -24,7 +24,7 @@ public final class TaskExecutor {
     private final List<LinkedBlockingQueue<ITask>> computerTasksPending;
     private final Object monitor;
 
-    private TaskExecutor() {
+    private TaskScheduler() {
         this.computerTasks = new WeakHashMap<>();
         this.computerTasksActive = new ArrayList<>();
         this.computerTasksPending = new ArrayList<>();
@@ -38,7 +38,7 @@ public final class TaskExecutor {
                 return;
             }
 
-            this.mainThread = new Thread(this::run, "CCLJ-TaskExecutor-Main");
+            this.mainThread = new Thread(this::run, "CCLJ-TaskScheduler-Main");
             this.mainThread.setDaemon(true);
             this.mainThread.start();
 
@@ -115,7 +115,7 @@ public final class TaskExecutor {
                 try {
                     final ITask task = queue.take();
 
-                    final Thread worker = new Thread(task::execute, "CCLJ-TaskExecutor-Worker");
+                    final Thread worker = new Thread(task::execute, "CCLJ-TaskScheduler-Worker");
                     worker.setDaemon(true);
                     worker.start();
                     worker.join(7000);
