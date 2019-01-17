@@ -17,15 +17,10 @@ public final class ComputerTransformer implements ITransformer {
 
     @Override
     public boolean transform(final ClassNode cn) {
-        this.transformInterfaces(cn);
         this.transformInitLua(cn);
         this.transformQueueEvent(cn);
 
         return true;
-    }
-
-    private void transformInterfaces(final ClassNode cn) {
-        cn.interfaces.add(ICOMPUTER_DESC);
     }
 
     private void transformInitLua(final ClassNode cn) {
@@ -54,7 +49,7 @@ public final class ComputerTransformer implements ITransformer {
                 final MethodInsnNode minsn = (MethodInsnNode) insn;
                 if(minsn.owner.equals(LUAJ_MACHINE_DESC) && minsn.name.equals("<init>") && minsn.desc.equals(String.format("(L%s;)V", COMPUTER_DESC)) && !minsn.itf) {
                     minsn.owner = CCLJ_MACHINE_DESC;
-                    minsn.desc = String.format("(L%s;)V", ICOMPUTER_DESC);
+                    minsn.desc = String.format("(L%s;)V", COMPUTER_DESC);
                     replacedInvokeSpecial = true;
                 }
             }

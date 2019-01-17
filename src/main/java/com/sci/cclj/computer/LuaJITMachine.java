@@ -6,6 +6,7 @@ import com.google.common.collect.Multimaps;
 import com.sci.cclj.CCLuaJIT;
 import com.sci.cclj.util.OS;
 import dan200.computercraft.core.apis.ILuaAPI;
+import dan200.computercraft.core.computer.Computer;
 import dan200.computercraft.core.lua.ILuaMachine;
 
 import java.io.*;
@@ -47,7 +48,7 @@ public final class LuaJITMachine implements ILuaMachine {
         }
     }
 
-    public final IComputer computer;
+    public final Computer computer;
 
     private final Object yieldResultsSignal = new Object();
     private final ListMultimap<String, Object[]> yieldResults;
@@ -61,7 +62,7 @@ public final class LuaJITMachine implements ILuaMachine {
 
     private volatile boolean yieldRequested;
 
-    public LuaJITMachine(final IComputer computer) {
+    public LuaJITMachine(final Computer computer) {
         this.computer = computer;
 
         this.yieldResults = Multimaps.synchronizedListMultimap(LinkedListMultimap.create());

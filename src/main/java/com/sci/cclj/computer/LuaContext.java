@@ -3,24 +3,21 @@ package com.sci.cclj.computer;
 import dan200.computercraft.api.lua.ILuaContext;
 import dan200.computercraft.api.lua.ILuaTask;
 import dan200.computercraft.api.lua.LuaException;
+import dan200.computercraft.core.computer.Computer;
+import dan200.computercraft.core.computer.ITask;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 public final class LuaContext implements ILuaContext {
     private static final MethodHandle GET_UNIQUE_TASK_ID_MH;
     private static final MethodHandle QUEUE_TASK_MH;
-    private static final Constructor<?> ITASK_PROXY_CLASS_CONSTRUCTOR;
 
     static {
         MethodHandle getUniqueTaskID_mh = null;
         MethodHandle queueTask_mh = null;
-        Constructor<?> iTask_proxy_class_constructor = null;
 
         try {
             final Class<?> MAIN_THREAD_CLASS = Class.forName("dan200.computercraft.core.computer.MainThread");
@@ -31,13 +28,11 @@ public final class LuaContext implements ILuaContext {
             queueTask_mh = lookup.findStatic(MAIN_THREAD_CLASS, "queueTask", MethodType.methodType(boolean.class, iTask_class));
 
             final Class<?> iTask_proxy_class = Proxy.getProxyClass(LuaContext.class.getClassLoader(), iTask_class);
-            iTask_proxy_class_constructor = iTask_proxy_class.getConstructor(InvocationHandler.class);
         } catch(final ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
             e.printStackTrace();
         } finally {
             GET_UNIQUE_TASK_ID_MH = getUniqueTaskID_mh;
             QUEUE_TASK_MH = queueTask_mh;
-            ITASK_PROXY_CLASS_CONSTRUCTOR = iTask_proxy_class_constructor;
         }
     }
 
@@ -89,53 +84,19 @@ public final class LuaContext implements ILuaContext {
     }
 
     @Override
-    public long issueMainThreadTask(final ILuaTask task) {
+    public long issueMainThreadTask(final ILuaTask luaTask) {
         try {
             final long id = (long) GET_UNIQUE_TASK_ID_MH.invoke();
-            final Object proxy = ITASK_PROXY_CLASS_CONSTRUCTOR.newInstance(new ITaskInvocationHandler(this.machine.computer, id, task));
-            if((Boolean) QUEUE_TASK_MH.invoke(proxy)) {
-                return id;
-            } else {
-                throw new LuaException("Task limit exceeded");
-            }
-        } catch(final Throwable t) {
-            throw new RuntimeException(t);
-        }
-    }
+            final ITask task = new ITask() {
+                @Override
+                public Computer getOwner() {
+                    return LuaContext.this.machine.computer;
+                }
 
-    private static final class ITaskInvocationHandler implements InvocationHandler {
-        // @TODO: Instead of using Proxy, generate this class with ASM (implements ITask)
-
-        static {
-            LuaJITMachine.registerSpecialEvent("task_complete");
-        }
-
-        private final IComputer computer;
-        private final long id;
-        private final ILuaTask task;
-
-        ITaskInvocationHandler(final IComputer computer, final long id, final ILuaTask task) {
-            this.computer = computer;
-            this.id = id;
-            this.task = task;
-        }
-
-        private void respond(final boolean result, final Object... args) {
-            final Object[] arguments = new Object[args.length + 2];
-            arguments[0] = this.id;
-            arguments[1] = result;
-            System.arraycopy(args, 0, arguments, 2, args.length);
-            this.computer.queueEvent("task_complete", arguments);
-        }
-
-        @Override
-        public Object invoke(final Object self, final Method method, final Object[] objects) throws Throwable {
-            switch(method.getName()) {
-                case "getComputer":
-                    return this.computer;
-                case "execute":
+                @Override
+                public void execute() {
                     try {
-                        final Object[] results = this.task.execute();
+                        final Object[] results = luaTask.execute();
                         if(results == null) {
                             this.respond(true);
                         } else {
@@ -146,10 +107,23 @@ public final class LuaContext implements ILuaContext {
                     } catch(final Throwable t) {
                         this.respond(false, String.format("Java Exception Thrown: %s", t.toString()));
                     }
-                    return null;
-                default:
-                    throw new Exception("Unknown method on ITask '" + method.getName() + "'");
+                }
+
+                private void respond(final boolean result, final Object... args) {
+                    final Object[] arguments = new Object[args.length + 2];
+                    arguments[0] = id;
+                    arguments[1] = result;
+                    System.arraycopy(args, 0, arguments, 2, args.length);
+                    LuaContext.this.machine.computer.queueEvent("task_complete", arguments);
+                }
+            };
+            if((Boolean) QUEUE_TASK_MH.invoke(task)) {
+                return id;
+            } else {
+                throw new LuaException("Task limit exceeded");
             }
+        } catch(final Throwable t) {
+            throw new RuntimeException(t);
         }
     }
 }
