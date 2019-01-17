@@ -26,8 +26,6 @@ public final class LuaContext implements ILuaContext {
             final MethodHandles.Lookup lookup = MethodHandles.lookup();
             getUniqueTaskID_mh = lookup.findStatic(MAIN_THREAD_CLASS, "getUniqueTaskID", MethodType.methodType(long.class));
             queueTask_mh = lookup.findStatic(MAIN_THREAD_CLASS, "queueTask", MethodType.methodType(boolean.class, iTask_class));
-
-            final Class<?> iTask_proxy_class = Proxy.getProxyClass(LuaContext.class.getClassLoader(), iTask_class);
         } catch(final ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
             e.printStackTrace();
         } finally {

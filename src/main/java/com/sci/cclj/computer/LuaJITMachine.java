@@ -92,11 +92,14 @@ public final class LuaJITMachine implements ILuaMachine {
                 throw new RuntimeException("Attempt to call yield with an event filter that is not registered: '" + filter + "'");
             }
 
+            TaskScheduler.INSTANCE.notifyYieldEnter(this.computer);
             while(true) {
                 if(this.yieldResults.containsKey(filter) && !this.yieldRequested) {
                     this.yieldRequested = true;
                     this.computer.queueEvent(null, null);
-                    return this.yieldResults.get(filter).remove(0);
+                    final Object[] results = this.yieldResults.get(filter).remove(0);
+                    TaskScheduler.INSTANCE.notifyYieldExit(this.computer);
+                    return results;
                 }
 
                 synchronized(this.yieldResultsSignal) {
