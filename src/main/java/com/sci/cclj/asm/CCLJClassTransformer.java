@@ -1,5 +1,6 @@
 package com.sci.cclj.asm;
 
+import com.sci.cclj.asm.transformers.ComputerThreadTransformer;
 import com.sci.cclj.asm.transformers.ComputerTransformer;
 import com.sci.cclj.asm.transformers.PullEventScanner;
 import net.minecraft.launchwrapper.IClassTransformer;
@@ -27,6 +28,7 @@ public final class CCLJClassTransformer implements IClassTransformer {
 
         this.addTransformer(new PullEventScanner());
         this.addTransformer(new ComputerTransformer());
+        this.addTransformer(new ComputerThreadTransformer());
     }
 
     private void addTransformer(final ITransformer transformer) {
