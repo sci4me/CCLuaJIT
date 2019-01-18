@@ -1,0 +1,15 @@
+.git
+.gitignore
+
+.idea
+*.iml
+*.ipr
+*.iws
+
+build-image.sh
+build-natives.sh
+
+build
+run
+.gradle
+gradle
