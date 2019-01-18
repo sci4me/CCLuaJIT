@@ -1,6 +1,9 @@
-FROM ubuntu:18.04
+FROM blitznote/debase:16.04
 
-RUN apt-get update && apt-get -y install mingw-w64 && apt-get -y install openjdk-8-jdk && apt-get install -y g++
+RUN apt-get update && apt-get -y install \
+    g++ \
+    g++-mingw-w64-x86-64 \
+    openjdk-8-jdk
 
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 

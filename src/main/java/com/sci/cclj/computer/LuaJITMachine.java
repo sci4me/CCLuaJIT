@@ -21,7 +21,8 @@ public final class LuaJITMachine implements ILuaMachine {
                 libraryExtension = "dll";
                 break;
             case OSX:
-                throw new RuntimeException("OSX is currently not supported");
+                libraryExtension = "dylib";
+                break;
             case LINUX:
                 libraryExtension = "so";
                 break;

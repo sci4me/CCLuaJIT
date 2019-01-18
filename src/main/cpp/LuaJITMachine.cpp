@@ -13,7 +13,9 @@
     #define JNICALL __stdcall
 #else
     #ifdef __APPLE__
-        #error "OSX not yet supported"
+        #define JNIEXPORT __attribute__((visibility("default")))
+        #define JNIIMPORT __attribute__((visibility("default")))
+        #define JNICALL
     #endif
 #endif
 

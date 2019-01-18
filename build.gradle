@@ -41,12 +41,7 @@ jar {
 }
 
 task buildDynamicLibrary(type: Exec) {
-    if(Os.isFamily(Os.FAMILY_WINDOWS)) {
-        throw new GradleException("Windows not yet supported")
-    } else {
-        commandLine "make"
-    }
-    workingDir "src/main/cpp"
+    commandLine "./build-natives.sh"
 }
 
 build.dependsOn buildDynamicLibrary
