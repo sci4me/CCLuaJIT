@@ -26,6 +26,7 @@ public final class TaskScheduler {
     private final Set<BlockingQueue<ITask>> computerTaskQueuesActiveSet;
 
     private final Map<Computer, TaskExecutor> computerTaskExecutors;
+    private final Map<Object, TaskExecutor> blocked;
     private final BlockingQueue<TaskExecutor> toFinish;
 
     private final BinarySemaphore dispatch;
@@ -41,6 +42,7 @@ public final class TaskScheduler {
         this.computerTaskQueuesActiveSet = new HashSet<>();
 
         this.computerTaskExecutors = new HashMap<>();
+        this.blocked = new HashMap<>();
         this.toFinish = new LinkedBlockingQueue<>();
 
         this.dispatch = new BinarySemaphore();
@@ -89,6 +91,8 @@ public final class TaskScheduler {
             if(taskExecutor == this.runningTaskExecutor) {
                 this.runningTaskExecutor = null;
             }
+
+            this.blocked.put(computer, taskExecutor);
         }
 
         this.dispatch.signal();
@@ -96,7 +100,7 @@ public final class TaskScheduler {
 
     void notifyYieldExit(final Computer computer) {
         synchronized(this.lock) {
-            final TaskExecutor taskExecutor = this.computerTaskExecutors.get(computer);
+            final TaskExecutor taskExecutor = this.blocked.remove(computer);
             taskExecutor.unblock();
         }
 
