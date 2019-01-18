@@ -1,7 +1,6 @@
 package com.sci.cclj.asm.transformers;
 
 import com.sci.cclj.asm.ITransformer;
-import com.sci.cclj.asm.Utils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
@@ -89,7 +88,7 @@ public final class ComputerTransformer implements ITransformer {
 
         final InsnList list = new InsnList();
         list.add(new VarInsnNode(Opcodes.ALOAD, 1));
-        list.add(new MethodInsnNode(Opcodes.INVOKESTATIC, CCLJ_MACHINE_DESC, "isSpecialEvent", "(Ljava/lang/String;)Z", false));
+        list.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PULLEVENTSCANNER_DESC, "isSpecialEvent", "(Ljava/lang/String;)Z", false));
         final LabelNode label = new LabelNode();
         list.add(new JumpInsnNode(Opcodes.IFEQ, label));
         list.add(new VarInsnNode(Opcodes.ALOAD, 0));

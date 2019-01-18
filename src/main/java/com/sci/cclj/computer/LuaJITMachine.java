@@ -4,14 +4,13 @@ import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimaps;
 import com.sci.cclj.CCLuaJIT;
+import com.sci.cclj.asm.transformers.PullEventScanner;
 import com.sci.cclj.util.OS;
 import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.computer.Computer;
 import dan200.computercraft.core.lua.ILuaMachine;
 
 import java.io.*;
-import java.util.HashSet;
-import java.util.Set;
 
 public final class LuaJITMachine implements ILuaMachine {
     static {
@@ -19,7 +18,8 @@ public final class LuaJITMachine implements ILuaMachine {
 
         switch(OS.check()) {
             case WINDOWS:
-                throw new RuntimeException("Windows is currently not supported");
+                libraryExtension = "dll";
+                break;
             case OSX:
                 throw new RuntimeException("OSX is currently not supported");
             case LINUX:
@@ -31,21 +31,6 @@ public final class LuaJITMachine implements ILuaMachine {
 
         final File library = new File(CCLuaJIT.getModDirectory(), "cclj." + libraryExtension);
         System.load(library.getPath());
-    }
-
-    private static final Object specialEventsLock = new Object();
-    private static final Set<String> specialEvents = new HashSet<>();
-
-    public static void registerSpecialEvent(final String filter) {
-        synchronized(LuaJITMachine.specialEventsLock) {
-            LuaJITMachine.specialEvents.add(filter);
-        }
-    }
-
-    public static boolean isSpecialEvent(final String filter) {
-        synchronized(LuaJITMachine.specialEventsLock) {
-            return LuaJITMachine.specialEvents.contains(filter);
-        }
     }
 
     public final Computer computer;
@@ -88,7 +73,7 @@ public final class LuaJITMachine implements ILuaMachine {
         if(arguments.length > 0 && arguments[0] instanceof String) {
             final String filter = (String) arguments[0];
 
-            if(!LuaJITMachine.isSpecialEvent(filter)) {
+            if(!PullEventScanner.isSpecialEvent(filter)) {
                 throw new RuntimeException("Attempt to call yield with an event filter that is not registered: '" + filter + "'");
             }
 
@@ -166,7 +151,7 @@ public final class LuaJITMachine implements ILuaMachine {
                 System.arraycopy(args, 0, arguments, 1, args.length);
             }
 
-            if(LuaJITMachine.isSpecialEvent(eventName)) {
+            if(PullEventScanner.isSpecialEvent(eventName)) {
                 this.yieldResults.put(eventName, arguments);
                 synchronized(this.yieldResultsSignal) {
                     this.yieldResultsSignal.notifyAll();

@@ -5,9 +5,27 @@ import com.sci.cclj.computer.LuaJITMachine;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import static com.sci.cclj.asm.Constants.*;
 
 public class PullEventScanner implements ITransformer {
+    private static final Object specialEventsLock = new Object();
+    private static final Set<String> specialEvents = new HashSet<>();
+
+    public static void registerSpecialEvent(final String filter) {
+        synchronized(PullEventScanner.specialEventsLock) {
+            PullEventScanner.specialEvents.add(filter);
+        }
+    }
+
+    public static boolean isSpecialEvent(final String filter) {
+        synchronized(PullEventScanner.specialEventsLock) {
+            return PullEventScanner.specialEvents.contains(filter);
+        }
+    }
+
     @Override
     public String clazz() {
         return null;
@@ -24,7 +42,7 @@ public class PullEventScanner implements ITransformer {
                             minsn.desc.equals(PULLEVENT_DESC)) {
                         final AbstractInsnNode prev = mn.instructions.get(mn.instructions.indexOf(minsn) - 1);
                         if(prev.getOpcode() == Opcodes.LDC) {
-                            LuaJITMachine.registerSpecialEvent((String) ((LdcInsnNode) prev).cst);
+                            PullEventScanner.registerSpecialEvent((String) ((LdcInsnNode) prev).cst);
                         } else {
                             throw new RuntimeException("Found call to pullEvent(raw?) but could not determine its event filter!");
                         }

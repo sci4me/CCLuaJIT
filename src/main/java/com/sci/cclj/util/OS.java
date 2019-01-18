@@ -7,7 +7,7 @@ public enum OS {
     OTHER;
 
     public static OS check() {
-        final String os = System.getProperty("os.name");
+        final String os = System.getProperty("os.name").toLowerCase();
         if(os.contains("win")) {
             return OS.WINDOWS;
         } else if(os.contains("mac")) {
