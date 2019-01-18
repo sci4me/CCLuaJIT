@@ -3,6 +3,24 @@
 
 #include <jni.h>
 
+//
+// HACKS: This is to allow us to compile for all platforms using the same jni.h
+//
+
+#ifdef _WIN32
+    #define JNIEXPORT __declspec(dllexport)
+    #define JNIIMPORT __declspec(dllimport)
+    #define JNICALL __stdcall
+#else
+    #ifdef __APPLE__
+        #error "OSX not yet supported"
+    #endif
+#endif
+
+//
+// End HACKS
+//
+
 extern "C" {
 #include <lua.h>
 #include <lualib.h>
@@ -537,7 +555,7 @@ static void dump_stack_element(lua_State *L, int i) {
             sprintf(buf, "%i (%i)  '%s'", i, j, lua_tostring(L, i));
             break;
         case LUA_TBOOLEAN:
-            sprintf(buf, "%i (%i)  %i", i, j, lua_toboolean(L, i) ? "true" : "false");
+            sprintf(buf, "%i (%i)  %s", i, j, lua_toboolean(L, i) ? "true" : "false");
             break;
         case LUA_TNUMBER:
             sprintf(buf, "%i (%i)  %g", i, j, lua_tonumber(L, i));
