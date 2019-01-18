@@ -105,7 +105,7 @@ public final class LuaJITMachine implements ILuaMachine {
                 synchronized(this.yieldResultsSignal) {
                     try {
                         this.yieldResultsSignal.wait();
-                    } catch(InterruptedException e) {
+                    } catch(final InterruptedException e) {
                         e.printStackTrace();
                     }
                 }

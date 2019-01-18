@@ -120,7 +120,6 @@ public final class TaskScheduler {
                         }
                     } else {
                         final TaskExecutor taskExecutor = this.toFinish.remove();
-                        this.runningTaskExecutor = taskExecutor;
                         this.finish(taskExecutor, taskExecutor.getTask());
                     }
                 }
@@ -152,7 +151,7 @@ public final class TaskScheduler {
         if(task == null) throw new IllegalArgumentException("task is null");
 
         synchronized(this.lock) {
-            if(taskExecutor == this.runningTaskExecutor) {
+            if(taskExecutor == this.runningTaskExecutor || this.runningTaskExecutor == null) {
                 final BlockingQueue<ITask> queue = this.taskQueues.remove(task);
 
                 if(queue.isEmpty()) {
@@ -167,9 +166,9 @@ public final class TaskScheduler {
             } else {
                 this.toFinish.add(taskExecutor);
             }
-
-            this.dispatch.signal();
         }
+
+        this.dispatch.signal();
     }
 
     private static final class TaskExecutor {
