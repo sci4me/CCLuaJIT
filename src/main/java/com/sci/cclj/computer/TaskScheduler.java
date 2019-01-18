@@ -26,8 +26,6 @@ public final class TaskScheduler {
     private final Set<BlockingQueue<ITask>> computerTaskQueuesActiveSet;
 
     private final Map<Computer, TaskExecutor> computerTaskExecutors;
-    private final BlockingQueue<TaskExecutor> toResume;
-
     private final BlockingQueue<TaskExecutor> toFinish;
 
     private final BinarySemaphore dispatch;
@@ -43,8 +41,6 @@ public final class TaskScheduler {
         this.computerTaskQueuesActiveSet = new HashSet<>();
 
         this.computerTaskExecutors = new HashMap<>();
-        this.toResume = new LinkedBlockingQueue<>();
-
         this.toFinish = new LinkedBlockingQueue<>();
 
         this.dispatch = new BinarySemaphore();
@@ -94,12 +90,14 @@ public final class TaskScheduler {
                 this.runningTaskExecutor = null;
             }
         }
+
+        this.dispatch.signal();
     }
 
     void notifyYieldExit(final Computer computer) {
         synchronized(this.lock) {
             final TaskExecutor taskExecutor = this.computerTaskExecutors.get(computer);
-            this.toResume.add(taskExecutor);
+            taskExecutor.unblock();
         }
 
         this.dispatch.signal();
@@ -114,17 +112,11 @@ public final class TaskScheduler {
                     if(this.runningTaskExecutor != null) continue;
 
                     if(this.toFinish.isEmpty()) {
-                        if(this.toResume.isEmpty()) {
-                            final BlockingQueue<ITask> queue = this.computerTaskQueuesActive.poll();
-                            if(queue != null) {
-                                final ITask task = queue.remove();
-                                this.taskQueues.put(task, queue);
-                                this.dispatchTask(task);
-                            }
-                        } else {
-                            final TaskExecutor taskExecutor = this.toResume.remove();
-                            this.runningTaskExecutor = taskExecutor;
-                            taskExecutor.unblock();
+                        final BlockingQueue<ITask> queue = this.computerTaskQueuesActive.poll();
+                        if(queue != null) {
+                            final ITask task = queue.remove();
+                            this.taskQueues.put(task, queue);
+                            this.dispatchTask(task);
                         }
                     } else {
                         final TaskExecutor taskExecutor = this.toFinish.remove();
@@ -139,6 +131,8 @@ public final class TaskScheduler {
     }
 
     private void dispatchTask(final ITask task) {
+        if(task == null) throw new IllegalArgumentException("task is null");
+
         synchronized(this.lock) {
             if(this.runningTaskExecutor != null)
                 throw new IllegalStateException("Attempt to dispatch parallel ITask!");
@@ -154,10 +148,10 @@ public final class TaskScheduler {
     }
 
     private void finish(final TaskExecutor taskExecutor, final ITask task) {
-        synchronized(this.lock) {
-            if(this.runningTaskExecutor == null)
-                throw new IllegalStateException("Attempt to finish ITask but runningTaskExecutor is null!");
+        if(taskExecutor == null) throw new IllegalArgumentException("taskExecutor is null");
+        if(task == null) throw new IllegalArgumentException("task is null");
 
+        synchronized(this.lock) {
             if(taskExecutor == this.runningTaskExecutor) {
                 final BlockingQueue<ITask> queue = this.taskQueues.remove(task);
 
@@ -167,6 +161,7 @@ public final class TaskScheduler {
                     this.computerTaskQueuesActive.add(queue);
                 }
 
+                taskExecutor.finishTask();
                 this.taskExecutorCache.returnObject(taskExecutor);
                 this.runningTaskExecutor = null;
             } else {
@@ -184,7 +179,7 @@ public final class TaskScheduler {
         private final BinarySemaphore submit;
         private final TaskRunner runner;
 
-        private final BinarySemaphore resume;
+        private final Object blockedInYieldLock = new Object();
         private boolean blockedInYield;
         private ITask task;
 
@@ -193,20 +188,22 @@ public final class TaskScheduler {
             this.submit = new BinarySemaphore();
             this.runner = new TaskRunner();
 
-            this.resume = new BinarySemaphore();
-
             final Thread thread = new Thread(this::run, "CCLJ-TaskScheduler-TaskExecutor-" + TaskExecutor.id++);
             thread.setDaemon(true);
             thread.start();
         }
 
         void block() {
-            this.blockedInYield = true;
+            synchronized(this.blockedInYieldLock) {
+                this.blockedInYield = true;
+            }
         }
 
         void unblock() {
-            this.blockedInYield = false;
-            this.resume.signal();
+            synchronized(this.blockedInYieldLock) {
+                this.blockedInYield = false;
+                this.blockedInYieldLock.notify();
+            }
         }
 
         boolean isUnavailable() {
@@ -222,6 +219,10 @@ public final class TaskScheduler {
                 throw new IllegalStateException("Attempt to submit an ITask to a TaskExecutor that is unavailable");
             this.task = task;
             this.submit.signal();
+        }
+
+        void finishTask() {
+            this.task = null;
         }
 
         void run() {
@@ -250,14 +251,14 @@ public final class TaskScheduler {
                             }
                         }
                     } finally {
-                        final ITask task = this.task;
-
-                        while(this.blockedInYield) {
-                            this.resume.await();
+                        while(true) {
+                            synchronized(this.blockedInYieldLock) {
+                                if(!this.blockedInYield) break;
+                                this.blockedInYieldLock.wait();
+                            }
                         }
 
-                        this.onTaskComplete.accept(this, task);
-                        this.task = null;
+                        this.onTaskComplete.accept(this, this.task);
                     }
                 }
             } catch(final InterruptedException e) {
@@ -301,8 +302,8 @@ public final class TaskScheduler {
         }
 
         void run() {
-            try {
-                while(true) {
+            while(true) {
+                try {
                     this.input.await();
                     try {
                         this.task.execute();
@@ -311,9 +312,9 @@ public final class TaskScheduler {
                     }
                     this.task = null;
                     this.finished.signal();
+                } catch(final InterruptedException ignored) {
+                    this.task = null;
                 }
-            } catch(final InterruptedException ignored) {
-                // @TODO ?
             }
         }
     }
