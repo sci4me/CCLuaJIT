@@ -1,2 +1,0 @@
-#!/bin/bash
-g++ -I"${JAVA_HOME}/include" -I"${JAVA_HOME}/include/linux" -I"$(realpath LuaJIT/include)" -L"$(realpath LuaJIT/bin/linux)" -l:libluajit-5.1.so.2 -Wl,-rpath,'$ORIGIN' -shared -fPIE -o out/cclj.so LuaJITMachine.cpp

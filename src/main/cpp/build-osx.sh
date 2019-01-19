@@ -1,2 +1,0 @@
-#!/bin/bash
-x86_64-apple-darwin15-c++ -D __APPLE__ -dynamiclib -Wl,-rpath,'$ORIGIN' -o out/cclj.dylib -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -I"$(realpath LuaJIT/include)" -L"$(realpath LuaJIT/bin/osx)" -l:libluajit-5.1.2.dylib LuaJITMachine.cpp

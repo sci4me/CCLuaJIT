@@ -3,10 +3,10 @@
 mkdir -p out
 
 echo "# Building Linux natives..."
-./build-linux.sh
+make TARGET_SYS=Linux
 
 echo "# Building Windows natives..."
-./build-windows.sh
+make TARGET_SYS=Windows
 
 echo "# Building OSX natives..."
-./build-osx.sh
+make TARGET_SYS=OSX

@@ -9,7 +9,12 @@
 build-image.sh
 build-natives.sh
 
+README.md
+LICENSE
+
 build
 run
 .gradle
 gradle
+src/main/java
+src/main/resources
