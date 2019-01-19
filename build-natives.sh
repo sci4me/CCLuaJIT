@@ -13,3 +13,5 @@ docker cp $CONTAINER_ID:/root/out/cclj.dylib build/libs/cclj.dylib
 cp LuaJIT/bin/linux/* build/libs
 cp LuaJIT/bin/windows/* build/libs
 cp LuaJIT/bin/osx/* build/libs
+
+docker container rm $CONTAINER_ID

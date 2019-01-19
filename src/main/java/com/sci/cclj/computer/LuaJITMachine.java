@@ -31,7 +31,6 @@ public final class LuaJITMachine implements ILuaMachine {
         }
 
         final File library = new File(CCLuaJIT.getModDirectory(), "cclj." + libraryExtension);
-        System.out.println("Loading " + library.getPath());
         System.load(library.getPath());
     }
 
