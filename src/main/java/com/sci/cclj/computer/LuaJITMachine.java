@@ -11,27 +11,31 @@ import dan200.computercraft.core.computer.Computer;
 import dan200.computercraft.core.lua.ILuaMachine;
 
 import java.io.*;
+import java.util.Arrays;
 
 public final class LuaJITMachine implements ILuaMachine {
     static {
-        final String libraryExtension;
-
+        final String libCCLJ;
+        final String libLuaJIT;
         switch(OS.check()) {
             case WINDOWS:
-                libraryExtension = "dll";
+                libCCLJ = "cclj.dll";
+                libLuaJIT = "lua51.dll";
                 break;
             case OSX:
-                libraryExtension = "dylib";
+                libCCLJ = "cclj.dylib";
+                libLuaJIT = "libluajit-5.1.2.dylib";
                 break;
             case LINUX:
-                libraryExtension = "so";
+                libCCLJ = "cclj.so";
+                libLuaJIT = "libluajit-5.1.so.2";
                 break;
             default:
                 throw new RuntimeException(String.format("Unknown operating system: '%s'", System.getProperty("os.name")));
         }
 
-        final File library = new File(CCLuaJIT.getModDirectory(), "cclj." + libraryExtension);
-        System.load(library.getPath());
+        System.load(new File(CCLuaJIT.getModDirectory(), libLuaJIT).getPath());
+        System.load(new File(CCLuaJIT.getModDirectory(), libCCLJ).getPath());
     }
 
     public final Computer computer;
