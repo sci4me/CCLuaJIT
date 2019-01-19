@@ -151,9 +151,6 @@ static jclass lua_exception_class = 0;
 static jmethodID lua_exception_getmessage_id = 0;
 static jmethodID lua_exception_getlevel_id = 0;
 
-static jclass luacontext_class = 0;
-static jmethodID luacontext_init_id = 0;
-
 static jclass iluaobject_class = 0;
 static jmethodID get_method_names_id = 0;
 static jmethodID call_method_id = 0;
@@ -434,10 +431,8 @@ static int invoke_java_fn(lua_State *L) {
         return 0;
     }
 
-    jobject luaContext = env->NewObject(luacontext_class, luacontext_init_id, machine);
-
     jobjectArray arguments = to_java_values(env, L, lua_gettop(L));
-    jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, luaContext, jfn->index, arguments);
+    jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, machine, jfn->index, arguments);
 
     // @TODO: should we do the exception check before or after servicing yield requests?
 
@@ -720,11 +715,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
-    if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaContext")) ||
-        !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "(Lcom/sci/cclj/computer/LuaJITMachine;)V"))) {
-        return CCLJ_JNIVERSION;
-    }
-
     if(!(iluaapi_class = get_class_global_ref(env, "dan200/computercraft/core/apis/ILuaAPI")) ||
         !(get_names_id = env->GetMethodID(iluaapi_class, "getNames", "()[Ljava/lang/String;"))) {
         return CCLJ_JNIVERSION;
@@ -762,7 +752,6 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(interruptedexception_class)      env->DeleteGlobalRef(interruptedexception_class);
     if(machine_class)                   env->DeleteGlobalRef(machine_class);
     if(lua_exception_class)             env->DeleteGlobalRef(lua_exception_class);
-    if(luacontext_class)                env->DeleteGlobalRef(luacontext_class);
     if(iluaapi_class)                   env->DeleteGlobalRef(iluaapi_class);
     if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
 }
