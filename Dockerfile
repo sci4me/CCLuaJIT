@@ -39,6 +39,9 @@ RUN git clone https://github.com/LuaJIT/LuaJIT.git && \
     make clean && \
     mingw64-make HOST_CC="gcc" CROSS="x86_64-w64-mingw32-" TARGET_SYS=Windows && \
     mv lua51.dll ../bin/windows && \
+    make clean && \
+    make HOST_CC="gcc" CC="cc" CROSS="x86_64-apple-darwin15-" TARGET_SYS=Darwin && \
+    mv libluajit.so ../bin/osx/libluajit-5.1.2.dylib && \
     cd ../..
 
 ADD /src/main/cpp /root/
