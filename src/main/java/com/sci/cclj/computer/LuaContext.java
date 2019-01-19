@@ -11,6 +11,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Proxy;
 
+// @TODO: is there any reason we're not just creating one of these in the LuaJITMachine
+
 public final class LuaContext implements ILuaContext {
     private static final MethodHandle GET_UNIQUE_TASK_ID_MH;
     private static final MethodHandle QUEUE_TASK_MH;

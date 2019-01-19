@@ -147,6 +147,10 @@ static jfieldID soft_abort_message_id = 0;
 static jfieldID hard_abort_message_id = 0;
 static jfieldID yield_requested_id = 0;
 
+static jclass lua_exception_class = 0;
+static jmethodID lua_exception_getmessage_id = 0;
+static jmethodID lua_exception_getlevel_id = 0;
+
 static jclass luacontext_class = 0;
 static jmethodID luacontext_init_id = 0;
 
@@ -435,6 +439,32 @@ static int invoke_java_fn(lua_State *L) {
     jobjectArray arguments = to_java_values(env, L, lua_gettop(L));
     jobjectArray results = (jobjectArray) env->CallObjectMethod(jfn->obj, call_method_id, luaContext, jfn->index, arguments);
 
+    // @TODO: should we do the exception check before or after servicing yield requests?
+
+    if(env->ExceptionCheck()) {
+        jthrowable e = env->ExceptionOccurred();
+
+        if(env->IsInstanceOf(e, lua_exception_class)) {
+            env->ExceptionClear();
+
+            jstring message = (jstring) env->CallObjectMethod(e, lua_exception_getmessage_id);
+            if(message) {
+                const char *messagec = env->GetStringUTFChars(message, JNI_FALSE);
+                luaL_error(L, messagec);
+                env->ReleaseStringUTFChars(message, messagec);
+            } else {
+                luaL_error(L, "an unknown error occurred");
+            }
+
+            env->DeleteLocalRef(message);
+            env->DeleteLocalRef(e);
+
+            return 0;
+        }
+
+        env->DeleteLocalRef(e);
+    }
+
     if(env->GetBooleanField(machine, yield_requested_id)) {
         env->SetBooleanField(machine, yield_requested_id, 0);
         lua_sethook(L, thread_yield_request_handler_hook, LUA_MASKCOUNT, 1);
@@ -684,6 +714,12 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
+    if(!(lua_exception_class = get_class_global_ref(env, "dan200/computercraft/api/lua/LuaException")) ||
+        !(lua_exception_getmessage_id = env->GetMethodID(lua_exception_class, "getMessage", "()Ljava/lang/String;")) ||
+        !(lua_exception_getlevel_id = env->GetMethodID(lua_exception_class, "getLevel", "()I"))) {
+        return CCLJ_JNIVERSION;
+    }
+
     if(!(luacontext_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaContext")) ||
         !(luacontext_init_id = env->GetMethodID(luacontext_class, "<init>", "(Lcom/sci/cclj/computer/LuaJITMachine;)V"))) {
         return CCLJ_JNIVERSION;
@@ -725,6 +761,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(identityhashmap_class)           env->DeleteGlobalRef(identityhashmap_class);
     if(interruptedexception_class)      env->DeleteGlobalRef(interruptedexception_class);
     if(machine_class)                   env->DeleteGlobalRef(machine_class);
+    if(lua_exception_class)             env->DeleteGlobalRef(lua_exception_class);
     if(luacontext_class)                env->DeleteGlobalRef(luacontext_class);
     if(iluaapi_class)                   env->DeleteGlobalRef(iluaapi_class);
     if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
