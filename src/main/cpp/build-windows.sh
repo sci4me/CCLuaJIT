@@ -1,2 +1,2 @@
 #!/bin/bash
-x86_64-w64-mingw32-g++ -Wl,-rpath,'$ORIGIN' -I"$JAVA_HOME/include" -I"LuaJIT/include" -L"$(realpath LuaJIT/bin/windows)" -l:luajit.dll -shared -o out/cclj.dll
+x86_64-w64-mingw32-g++ -Wl,--kill-at,-rpath,'$ORIGIN' -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -I"LuaJIT/include" -L"$(realpath LuaJIT/bin/windows)" -l:lua51.dll -shared -o out/cclj.dll -D _WIN32 LuaJITMachine.cpp

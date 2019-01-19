@@ -7,15 +7,21 @@
 // HACKS: This is to allow us to compile for all platforms using the same jni.h
 //
 
-#ifdef _WIN32
-    #define JNIEXPORT __declspec(dllexport)
-    #define JNIIMPORT __declspec(dllimport)
-    #define JNICALL __stdcall
-#else
-    #ifdef __APPLE__
+#if defined(_WIN32) || defined(__APPLE__)
+    #undef JNIEXPORT
+    #undef JNIIMPORT
+    #undef JNICALL
+
+    #if defined(_WIN32)
+        #define JNIEXPORT __declspec(dllexport)
+        #define JNIIMPORT __declspec(dllimport)
+        #define JNICALL __stdcall
+    #elif defined(__APPLE__)
         #define JNIEXPORT __attribute__((visibility("default")))
         #define JNIIMPORT __attribute__((visibility("default")))
         #define JNICALL
+    #else
+        #error "unreachable"
     #endif
 #endif
 
