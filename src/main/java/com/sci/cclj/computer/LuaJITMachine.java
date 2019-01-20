@@ -6,6 +6,7 @@ import com.google.common.collect.Multimaps;
 import com.sci.cclj.CCLuaJIT;
 import com.sci.cclj.asm.transformers.PullEventScanner;
 import com.sci.cclj.util.OS;
+import dan200.computercraft.api.ComputerCraftAPI;
 import dan200.computercraft.api.lua.ILuaContext;
 import dan200.computercraft.api.lua.ILuaTask;
 import dan200.computercraft.api.lua.LuaException;
@@ -18,12 +19,15 @@ import java.io.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     private static final MethodHandle GET_UNIQUE_TASK_ID_MH;
     private static final MethodHandle QUEUE_TASK_MH;
 
     static {
+        // @TODO: extract the natives from our jar? (GZIP)
+
         final String libCCLJ;
         final String libLuaJIT;
         switch(OS.check()) {
@@ -82,12 +86,12 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
 
         this.yieldResults = Multimaps.synchronizedListMultimap(LinkedListMultimap.create());
 
-        if(!this.createLuaState()) {
+        if(!this.createLuaState(ComputerCraftAPI.getInstalledVersion(), CCLuaJIT.MC_VERSION, ThreadLocalRandom.current().nextLong())) {
             throw new RuntimeException("Failed to create native Lua state");
         }
     }
 
-    private native boolean createLuaState();
+    private native boolean createLuaState(final String ccVersion, final String mcVersion, final long randomSeed);
 
     private native void destroyLuaState();
 

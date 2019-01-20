@@ -8,9 +8,11 @@ import java.io.File;
 import java.net.URISyntaxException;
 import java.util.Map;
 
-@IFMLLoadingPlugin.MCVersion("1.7.10")
+@IFMLLoadingPlugin.MCVersion(CCLuaJIT.MC_VERSION)
 @IFMLLoadingPlugin.TransformerExclusions({"com.sci.cclj"})
 public final class CCLuaJIT implements IFMLLoadingPlugin {
+    public static final String MC_VERSION = "1.7.10";
+
     public static File getModDirectory() {
         try {
             return new File(LuaJITMachine.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile();

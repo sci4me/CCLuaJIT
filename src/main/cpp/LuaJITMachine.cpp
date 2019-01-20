@@ -173,6 +173,14 @@ static jclass get_class_global_ref(JNIEnv *env, const char *name) {
     return (jclass) env->NewGlobalRef((jobject) clazz);
 }
 
+static int __inext(lua_State *L) {
+    lua_Number n = lua_tonumber(L, 2) + 1;
+    lua_pushnumber(L, n);
+    lua_pushnumber(L, n);
+    lua_gettable(L, 1);
+    return lua_isnil(L, -1) ? 0 : 2;
+}
+
 static int finalize_jobject_ref(lua_State *L) {
     jobject *obj = (jobject*) luaL_checkudata(L, 1, "jobject_ref");
     if(!obj) luaL_error(L, "Attempt to finalize finalized jobject_ref");
@@ -756,7 +764,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
 }
 
-CCLJ_JNIEXPORT(jboolean, createLuaState) {
+CCLJ_JNIEXPORT(jboolean, createLuaState, jstring cc_version, jstring mc_version, jlong random_seed) {
     if(!initialized) return 0;
 
     lua_State *L = luaL_newstate();
@@ -767,6 +775,27 @@ CCLJ_JNIEXPORT(jboolean, createLuaState) {
     luaopen_string(L);
     luaopen_table(L);
     luaopen_bit(L);
+
+    lua_pushcfunction(L, __inext);
+    lua_setglobal(L, "__inext");
+
+    #define SET_GLOBAL_STRING(key, value) { const char *s = env->GetStringUTFChars(value, JNI_FALSE); lua_pushstring(L, s); lua_setglobal(L, key); env->ReleaseStringUTFChars(value, s); }
+        SET_GLOBAL_STRING("_CC_VERSION", cc_version)
+        SET_GLOBAL_STRING("_MC_VERSION", mc_version)
+    #undef SET_GLOBAL_STRING
+
+    lua_pushnil(L);
+    lua_setglobal(L, "collectgarbage");
+    lua_pushnil(L);
+    lua_setglobal(L, "gcinfo");
+    lua_pushnil(L);
+    lua_setglobal(L, "newproxy");
+
+    lua_getglobal(L, "math");
+    lua_pushstring(L, "randomseed");
+    lua_gettable(L, -2);
+    lua_pushnumber(L, random_seed);
+    lua_call(L, 1, 0);
 
     lua_pushlightuserdata(L, (void*)&REGISTRY_KEY_MACHINE);
     new_jobject_ref(env, L, obj);
