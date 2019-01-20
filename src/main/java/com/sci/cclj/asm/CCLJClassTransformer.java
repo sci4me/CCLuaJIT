@@ -8,23 +8,20 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 
-import java.util.*;
-
-import static com.sci.cclj.asm.Constants.LUACONTEXT_CLASS;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 // @TODO: Modify OSAPI queueEvent to prepend a sentinel object to arguments in case event filter is a special event?
 
 public final class CCLJClassTransformer implements IClassTransformer {
-    private final Set<String> exclusions;
     private final Map<String, ITransformer> transformers;
     private final List<ITransformer> transformersForAll;
 
     public CCLJClassTransformer() {
-        this.exclusions = new HashSet<>();
         this.transformers = new HashMap<>();
         this.transformersForAll = new ArrayList<>();
-
-        this.exclusions.add(LUACONTEXT_CLASS);
 
         this.addTransformer(new PullEventScanner());
         this.addTransformer(new ComputerTransformer());
@@ -50,10 +47,6 @@ public final class CCLJClassTransformer implements IClassTransformer {
         if(basicClass == null) return null;
 
         try {
-            if(this.exclusions.contains(name)) {
-                return basicClass;
-            }
-
             final ClassNode cn = new ClassNode();
             final ClassReader cr = new ClassReader(basicClass);
             cr.accept(cn, 0);

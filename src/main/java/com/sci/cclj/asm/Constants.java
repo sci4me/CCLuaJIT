@@ -8,7 +8,6 @@ public final class Constants {
     public static final String ILUAMACHINE_DESC = "dan200/computercraft/core/lua/ILuaMachine";
     public static final String LUAJ_MACHINE_DESC = "dan200/computercraft/core/lua/LuaJLuaMachine";
 
-    public static final String LUACONTEXT_CLASS = "com.sci.cclj.computer.LuaContext";
     public static final String CCLJ_MACHINE_DESC = "com/sci/cclj/computer/LuaJITMachine";
     public static final String TASKSCHEDULER_DESC = "com/sci/cclj/computer/TaskScheduler";
     public static final String PULLEVENTSCANNER_DESC = "com/sci/cclj/asm/transformers/PullEventScanner";
