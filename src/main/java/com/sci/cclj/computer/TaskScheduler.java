@@ -26,8 +26,8 @@ public final class TaskScheduler {
     private final Set<BlockingQueue<ITask>> computerTaskQueuesActiveSet;
 
     private final Map<Computer, TaskExecutor> computerTaskExecutors;
-    private final Map<Object, TaskExecutor> blocked;
-    private final BlockingQueue<TaskExecutor> toFinish;
+    private final Map<Object, TaskExecutor> blockedTaskExecutors;
+    private final BlockingQueue<TaskExecutor> taskExecutorsToFinish;
 
     private final BinarySemaphore dispatch;
 
@@ -42,8 +42,8 @@ public final class TaskScheduler {
         this.computerTaskQueuesActiveSet = new HashSet<>();
 
         this.computerTaskExecutors = new HashMap<>();
-        this.blocked = new HashMap<>();
-        this.toFinish = new LinkedBlockingQueue<>();
+        this.blockedTaskExecutors = new HashMap<>();
+        this.taskExecutorsToFinish = new LinkedBlockingQueue<>();
 
         this.dispatch = new BinarySemaphore();
     }
@@ -92,7 +92,7 @@ public final class TaskScheduler {
                 this.runningTaskExecutor = null;
             }
 
-            this.blocked.put(computer, taskExecutor);
+            this.blockedTaskExecutors.put(computer, taskExecutor);
         }
 
         this.dispatch.signal();
@@ -100,7 +100,7 @@ public final class TaskScheduler {
 
     void notifyYieldExit(final Computer computer) {
         synchronized(this.lock) {
-            final TaskExecutor taskExecutor = this.blocked.remove(computer);
+            final TaskExecutor taskExecutor = this.blockedTaskExecutors.remove(computer);
             taskExecutor.unblock();
         }
 
@@ -115,7 +115,7 @@ public final class TaskScheduler {
                 synchronized(this.lock) {
                     if(this.runningTaskExecutor != null) continue;
 
-                    if(this.toFinish.isEmpty()) {
+                    if(this.taskExecutorsToFinish.isEmpty()) {
                         final BlockingQueue<ITask> queue = this.computerTaskQueuesActive.poll();
                         if(queue != null) {
                             final ITask task = queue.remove();
@@ -123,7 +123,7 @@ public final class TaskScheduler {
                             this.dispatchTask(task);
                         }
                     } else {
-                        final TaskExecutor taskExecutor = this.toFinish.remove();
+                        final TaskExecutor taskExecutor = this.taskExecutorsToFinish.remove();
                         this.finish(taskExecutor, taskExecutor.getTask());
                     }
                 }
@@ -168,7 +168,7 @@ public final class TaskScheduler {
                 this.taskExecutorCache.returnObject(taskExecutor);
                 this.runningTaskExecutor = null;
             } else {
-                this.toFinish.add(taskExecutor);
+                this.taskExecutorsToFinish.add(taskExecutor);
             }
         }
 
