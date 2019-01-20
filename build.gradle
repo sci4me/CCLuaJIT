@@ -17,6 +17,14 @@ buildscript {
 
 apply plugin: 'forge'
 
+def env = System.getenv()
+
+if (env.BUILD_NUMBER != null) {
+    mod_version += "-" + env.BUILD_NUMBER
+} else {
+    mod_version += "-unknown"
+}
+
 version = minecraft_version + "-" + mod_version
 group = "com.sci.cclj"
 archivesBaseName = "CCLuaJIT"
