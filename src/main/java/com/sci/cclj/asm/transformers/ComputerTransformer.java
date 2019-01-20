@@ -95,7 +95,7 @@ public final class ComputerTransformer implements ITransformer {
         list.add(new FieldInsnNode(Opcodes.GETFIELD, COMPUTER_DESC, "m_machine", String.format("L%s;", ILUAMACHINE_DESC)));
         list.add(new VarInsnNode(Opcodes.ALOAD, 1));
         list.add(new VarInsnNode(Opcodes.ALOAD, 2));
-        list.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, ILUAMACHINE_DESC, "handleEvent", HANDLEEVENT_DESC));
+        list.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, ILUAMACHINE_DESC, "handleEvent", ILUAMACHINE_HANDLEEVENT_DESC));
         list.add(new InsnNode(Opcodes.RETURN));
         list.add(label);
 

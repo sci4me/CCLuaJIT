@@ -13,7 +13,7 @@ public final class Constants {
     public static final String PULLEVENTSCANNER_DESC = "com/sci/cclj/asm/transformers/PullEventScanner";
 
     public static final String COMPUTERTHREAD_QUEUETASK_DESC = "(Ldan200/computercraft/core/computer/ITask;Ldan200/computercraft/core/computer/Computer;)V";
-    public static final String HANDLEEVENT_DESC = "(Ljava/lang/String;[Ljava/lang/Object;)V";
+    public static final String ILUAMACHINE_HANDLEEVENT_DESC = "(Ljava/lang/String;[Ljava/lang/Object;)V";
 
     public static final String ILUACONTEXT_DESC = "dan200/computercraft/api/lua/ILuaContext";
     public static final String PULLEVENT_DESC = "(Ljava/lang/String;)[Ljava/lang/Object;";
