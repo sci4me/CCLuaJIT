@@ -6,31 +6,32 @@ docker run --name $CONTAINER_NAME cclj_build /root/build.sh
 
 CONTAINER_ID=$(docker ps -aqf "name=$CONTAINER_NAME")
 
+rm -rf src/main/resources/natives
+mkdir src/main/resources/natives
+
 status=0
-
-docker cp ${CONTAINER_ID}:/root/out/cclj.so build/libs/cclj.so
+docker cp ${CONTAINER_ID}:/root/out/cclj.so src/main/resources/natives/cclj.so
+if [[ $? -ne 0 ]]; then
+    status=1
+fi
+docker cp ${CONTAINER_ID}:/root/out/cclj.dll src/main/resources/natives/cclj.dll
+if [[ $? -ne 0 ]]; then
+    status=1
+fi
+docker cp ${CONTAINER_ID}:/root/out/cclj.dylib src/main/resources/natives/cclj.dylib
 if [[ $? -ne 0 ]]; then
     status=1
 fi
 
-docker cp ${CONTAINER_ID}:/root/out/cclj.dll build/libs/cclj.dll
-if [[ $? -ne 0 ]]; then
-    status=1
-fi
-
-docker cp ${CONTAINER_ID}:/root/out/cclj.dylib build/libs/cclj.dylib
-if [[ $? -ne 0 ]]; then
-    status=1
-fi
-
-docker cp ${CONTAINER_ID}:/root/LuaJIT/bin/linux/libluajit-5.1.so.2 build/libs
-docker cp ${CONTAINER_ID}:/root/LuaJIT/bin/windows/lua51.dll build/libs
-docker cp ${CONTAINER_ID}:/root/LuaJIT/bin/osx/libluajit-5.1.2.dylib build/libs
+docker cp ${CONTAINER_ID}:/root/LuaJIT/bin/linux/libluajit-5.1.so.2 src/main/resources/natives
+docker cp ${CONTAINER_ID}:/root/LuaJIT/bin/windows/lua51.dll src/main/resources/natives
+docker cp ${CONTAINER_ID}:/root/LuaJIT/bin/osx/libluajit-5.1.2.dylib src/main/resources/natives
 
 docker container rm ${CONTAINER_ID}
 
 if [[ $status -ne 0 ]]; then
     echo "Building natives failed!"
+    exit $status
+else
+    gzip -9 src/main/resources/natives/*
 fi
-
-exit $status

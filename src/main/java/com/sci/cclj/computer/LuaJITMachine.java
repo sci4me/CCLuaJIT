@@ -13,20 +13,60 @@ import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.computer.Computer;
 import dan200.computercraft.core.computer.ITask;
 import dan200.computercraft.core.lua.ILuaMachine;
+import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.zip.GZIPInputStream;
 
 public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     private static final MethodHandle GET_UNIQUE_TASK_ID_MH;
     private static final MethodHandle QUEUE_TASK_MH;
 
     static {
-        // @TODO: extract the natives from our jar? (GZIP)
+        try {
+            LuaJITMachine.loadNatives();
+        } catch(final IOException e) {
+            e.printStackTrace();
+        }
 
+        MethodHandle getUniqueTaskID_mh = null;
+        MethodHandle queueTask_mh = null;
+        try {
+            final Class<?> MAIN_THREAD_CLASS = Class.forName("dan200.computercraft.core.computer.MainThread");
+            final Class<?> iTask_class = Class.forName("dan200.computercraft.core.computer.ITask");
+
+            final MethodHandles.Lookup lookup = MethodHandles.lookup();
+            getUniqueTaskID_mh = lookup.findStatic(MAIN_THREAD_CLASS, "getUniqueTaskID", MethodType.methodType(long.class));
+            queueTask_mh = lookup.findStatic(MAIN_THREAD_CLASS, "queueTask", MethodType.methodType(boolean.class, iTask_class));
+        } catch(final ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
+            e.printStackTrace();
+        } finally {
+            GET_UNIQUE_TASK_ID_MH = getUniqueTaskID_mh;
+            QUEUE_TASK_MH = queueTask_mh;
+        }
+    }
+
+    private static File extract(final String name) throws IOException {
+        final File result = File.createTempFile("cclj", name);
+        result.deleteOnExit();
+
+        final GZIPInputStream in = new GZIPInputStream(LuaJITMachine.class.getResourceAsStream("/natives/" + name + ".gz"));
+        final FileOutputStream out = new FileOutputStream(result);
+
+        IOUtils.copy(in, out);
+
+        in.close();
+        out.flush();
+        out.close();
+
+        return result;
+    }
+
+    private static void loadNatives() throws IOException {
         final String libCCLJ;
         final String libLuaJIT;
         switch(OS.check()) {
@@ -46,24 +86,11 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
                 throw new RuntimeException(String.format("Unknown operating system: '%s'", System.getProperty("os.name")));
         }
 
-        System.load(new File(CCLuaJIT.getModDirectory(), libLuaJIT).getPath());
-        System.load(new File(CCLuaJIT.getModDirectory(), libCCLJ).getPath());
+        final File ccljFile = LuaJITMachine.extract(libCCLJ);
+        final File luajitFile = LuaJITMachine.extract(libLuaJIT);
 
-        MethodHandle getUniqueTaskID_mh = null;
-        MethodHandle queueTask_mh = null;
-        try {
-            final Class<?> MAIN_THREAD_CLASS = Class.forName("dan200.computercraft.core.computer.MainThread");
-            final Class<?> iTask_class = Class.forName("dan200.computercraft.core.computer.ITask");
-
-            final MethodHandles.Lookup lookup = MethodHandles.lookup();
-            getUniqueTaskID_mh = lookup.findStatic(MAIN_THREAD_CLASS, "getUniqueTaskID", MethodType.methodType(long.class));
-            queueTask_mh = lookup.findStatic(MAIN_THREAD_CLASS, "queueTask", MethodType.methodType(boolean.class, iTask_class));
-        } catch(final ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
-            e.printStackTrace();
-        } finally {
-            GET_UNIQUE_TASK_ID_MH = getUniqueTaskID_mh;
-            QUEUE_TASK_MH = queueTask_mh;
-        }
+        System.load(ccljFile.getPath());
+        System.load(luajitFile.getPath());
     }
 
     public final Computer computer;
