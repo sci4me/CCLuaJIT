@@ -1,5 +1,5 @@
 CC=
-INCLUDES=-I"jni-headers" -I"LuaJIT/src"
+INCLUDES=-I"LuaJIT/src" -I"jni-headers"
 FLAGS=
 TARGET_LIB=
 OUT_DIR=out
@@ -19,7 +19,7 @@ else
 ifeq ($(TARGET_SYS), OSX)
 	CC=x86_64-apple-darwin15-c++
 	INCLUDES+=-I"jni-headers/darwin"
-	FLAGS=-L"LuaJIT/bin/osx" -l:libluajit-5.1.2.dylib -single_module -undefined dynamic_lookup -D __APPLE__
+	FLAGS=-single_module -undefined dynamic_lookup -D __APPLE__
 	TARGET_LIB=cclj.dylib
 else
 $(error TARGET_SYS must be set to Linux, Windows, or OSX)
