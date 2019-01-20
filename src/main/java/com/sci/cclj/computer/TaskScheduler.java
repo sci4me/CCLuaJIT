@@ -10,6 +10,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.BiConsumer;
 
+// @TODO: can we limit the number of threads used? I thought there might be a reason we _CAN'T_ but .. maybe we can
+
 public final class TaskScheduler {
     public static final TaskScheduler INSTANCE = new TaskScheduler();
 

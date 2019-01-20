@@ -89,8 +89,8 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
         final File ccljFile = LuaJITMachine.extract(libCCLJ);
         final File luajitFile = LuaJITMachine.extract(libLuaJIT);
 
-        System.load(ccljFile.getPath());
         System.load(luajitFile.getPath());
+        System.load(ccljFile.getPath());
     }
 
     public final Computer computer;
