@@ -19,6 +19,7 @@ import java.io.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.nio.file.Files;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
 
@@ -50,8 +51,8 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
         }
     }
 
-    private static File extract(final String name) throws IOException {
-        final File result = File.createTempFile("cclj", name);
+    private static File extract(final File location, final String name) throws IOException {
+        final File result = new File(location, name);
         result.deleteOnExit();
 
         final GZIPInputStream in = new GZIPInputStream(LuaJITMachine.class.getResourceAsStream("/natives/" + name + ".gz"));
@@ -86,11 +87,14 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
                 throw new RuntimeException(String.format("Unknown operating system: '%s'", System.getProperty("os.name")));
         }
 
-        final File luajitFile = LuaJITMachine.extract(libLuaJIT);
-        final File ccljFile = LuaJITMachine.extract(libCCLJ);
+        final File tempDir = Files.createTempDirectory("cclj-natives").toFile();
+        tempDir.deleteOnExit();
 
-        System.load(luajitFile.getPath());
-        System.load(ccljFile.getPath());
+        final File luajitFile = LuaJITMachine.extract(tempDir, libLuaJIT);
+        final File ccljFile = LuaJITMachine.extract(tempDir, libCCLJ);
+
+        System.load(luajitFile.getAbsolutePath());
+        System.load(ccljFile.getAbsolutePath());
     }
 
     public final Computer computer;
