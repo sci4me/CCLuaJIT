@@ -6,7 +6,6 @@ import com.google.common.collect.Multimaps;
 import com.sci.cclj.CCLuaJIT;
 import com.sci.cclj.asm.transformers.PullEventScanner;
 import com.sci.cclj.util.OS;
-import dan200.computercraft.api.ComputerCraftAPI;
 import dan200.computercraft.api.lua.ILuaContext;
 import dan200.computercraft.api.lua.ILuaTask;
 import dan200.computercraft.api.lua.LuaException;
@@ -86,7 +85,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
 
         this.yieldResults = Multimaps.synchronizedListMultimap(LinkedListMultimap.create());
 
-        if(!this.createLuaState(ComputerCraftAPI.getInstalledVersion(), CCLuaJIT.MC_VERSION, ThreadLocalRandom.current().nextLong())) {
+        if(!this.createLuaState(CCLuaJIT.getInstalledComputerCraftVersion(), CCLuaJIT.MC_VERSION, ThreadLocalRandom.current().nextLong())) {
             throw new RuntimeException("Failed to create native Lua state");
         }
     }
