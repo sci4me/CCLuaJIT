@@ -10,7 +10,7 @@ import org.objectweb.asm.tree.ClassNode;
 
 import java.util.*;
 
-import static com.sci.cclj.asm.Constants.*;
+import static com.sci.cclj.asm.Constants.LUACONTEXT_CLASS;
 
 // @TODO: Modify OSAPI queueEvent to prepend a sentinel object to arguments in case event filter is a special event?
 
@@ -47,30 +47,37 @@ public final class CCLJClassTransformer implements IClassTransformer {
 
     @Override
     public byte[] transform(final String name, final String transformedName, final byte[] basicClass) {
-        if(this.exclusions.contains(name)) {
-            return basicClass;
-        }
+        if(basicClass == null) return null;
 
-        final ClassNode cn = new ClassNode();
-        final ClassReader cr = new ClassReader(basicClass);
-        cr.accept(cn, 0);
-
-        boolean transformed = this.transformersForAll.stream()
-                .map(t -> t.transform(cn))
-                .reduce(false, (a, b) -> a || b);
-
-        if(this.transformers.containsKey(name)) {
-            final ITransformer transformer = this.transformers.get(name);
-            if(transformer.transform(cn)) {
-                transformed = true;
+        try {
+            if(this.exclusions.contains(name)) {
+                return basicClass;
             }
-        }
 
-        if(transformed) {
-            final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            cn.accept(cw);
-            return cw.toByteArray();
-        } else {
+            final ClassNode cn = new ClassNode();
+            final ClassReader cr = new ClassReader(basicClass);
+            cr.accept(cn, 0);
+
+            boolean transformed = this.transformersForAll.stream()
+                    .map(t -> t.transform(cn))
+                    .reduce(false, (a, b) -> a || b);
+
+            if(this.transformers.containsKey(name)) {
+                final ITransformer transformer = this.transformers.get(name);
+                if(transformer.transform(cn)) {
+                    transformed = true;
+                }
+            }
+
+            if(transformed) {
+                final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                cn.accept(cw);
+                return cw.toByteArray();
+            } else {
+                return basicClass;
+            }
+        } catch(final Throwable t) {
+            t.printStackTrace();
             return basicClass;
         }
     }
