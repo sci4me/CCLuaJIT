@@ -86,8 +86,8 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
                 throw new RuntimeException(String.format("Unknown operating system: '%s'", System.getProperty("os.name")));
         }
 
-        final File ccljFile = LuaJITMachine.extract(libCCLJ);
         final File luajitFile = LuaJITMachine.extract(libLuaJIT);
+        final File ccljFile = LuaJITMachine.extract(libCCLJ);
 
         System.load(luajitFile.getPath());
         System.load(ccljFile.getPath());

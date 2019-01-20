@@ -13,13 +13,13 @@ else
 ifeq ($(TARGET_SYS), Windows)
 	CC=x86_64-w64-mingw32-c++
 	INCLUDES+=-I"jni-headers/win32"
-	FLAGS=-L"LuaJIT/bin/windows" -l:lua51.dll -shared -Wl,--kill-at -D _WIN32
+	FLAGS=-L"LuaJIT/bin/windows" -l:lua51.dll -shared -Wl,--kill-at
 	TARGET_LIB=cclj.dll
 else
 ifeq ($(TARGET_SYS), OSX)
 	CC=x86_64-apple-darwin15-c++
 	INCLUDES+=-I"jni-headers/darwin"
-	FLAGS=-single_module -undefined dynamic_lookup -D __APPLE__
+	FLAGS=-single_module -undefined dynamic_lookup
 	TARGET_LIB=cclj.dylib
 else
 $(error TARGET_SYS must be set to Linux, Windows, or OSX)
