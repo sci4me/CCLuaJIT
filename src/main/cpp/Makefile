@@ -5,7 +5,7 @@ TARGET_LIB=
 OUT_DIR=out
 
 ifeq ($(TARGET_SYS), Linux)
-	CC=g++
+	CC=clang
 	INCLUDES+=-I"jni-headers/linux"
 	FLAGS=-L"LuaJIT/bin/linux" -l:libluajit-5.1.so.2 -shared -fPIE
 	TARGET_LIB=cclj.so

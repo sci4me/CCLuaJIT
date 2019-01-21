@@ -6,12 +6,10 @@ WORKDIR /root
 RUN dnf -y install \
     clang \
     findutils \
-    gcc-c++ \
     git \
     make \
     mingw64-gcc-c++.x86_64 \
     patch \
-    wget \
     which \
     xz && \
     dnf clean all && \
@@ -20,7 +18,7 @@ RUN dnf -y install \
 # Install osxcross for Mac cross-compilation
 RUN git clone https://github.com/tpoechtrager/osxcross && \
     cd osxcross && \
-    wget --no-check-certificate -P tarballs https://s3.dockerproject.org/darwin/v2/MacOSX10.11.sdk.tar.xz && \
+    curl -o tarballs/MacOSX10.11.sdk.tar.xz https://s3.dockerproject.org/darwin/v2/MacOSX10.11.sdk.tar.xz && \
     sed -i -e 's|-march=native||g' build_clang.sh wrapper/build.sh && \
     UNATTENDED=yes OSX_VERSION_MIN=10.7 ./build.sh && \
     mkdir /root/osxcross-target && \
