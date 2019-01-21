@@ -26,6 +26,10 @@ public class PullEventScanner implements ITransformer {
         }
     }
 
+    static {
+        PullEventScanner.registerSpecialEvent("task_complete");
+    }
+
     @Override
     public String clazz() {
         return null;
