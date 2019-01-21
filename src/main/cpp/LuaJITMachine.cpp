@@ -756,6 +756,9 @@ CCLJ_JNIEXPORT(jboolean, createLuaState, jstring cc_version, jstring mc_version,
         SET_GLOBAL_STRING("_MC_VERSION", mc_version)
     #undef SET_GLOBAL_STRING
 
+    lua_pushstring(L, "Lua 5.1");
+    lua_setglobal(L, "_VERSION");
+
     lua_pushnil(L);
     lua_setglobal(L, "collectgarbage");
     lua_pushnil(L);
