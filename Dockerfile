@@ -13,7 +13,6 @@ RUN dnf -y install \
     patch \
     wget \
     which \
-    which \
     xz && \
     dnf clean all && \
     rm -rf /var/cache/yum
