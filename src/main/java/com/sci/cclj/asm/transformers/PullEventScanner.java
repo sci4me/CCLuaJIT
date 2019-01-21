@@ -1,14 +1,14 @@
 package com.sci.cclj.asm.transformers;
 
 import com.sci.cclj.asm.ITransformer;
-import com.sci.cclj.computer.LuaJITMachine;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.sci.cclj.asm.Constants.*;
+import static com.sci.cclj.asm.Constants.ILUACONTEXT_DESC;
+import static com.sci.cclj.asm.Constants.PULLEVENT_DESC;
 
 public class PullEventScanner implements ITransformer {
     private static final Object specialEventsLock = new Object();
