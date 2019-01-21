@@ -16,8 +16,9 @@ public final class CCLuaJITModContainer extends DummyModContainer {
         final ModMetadata meta = this.getMetadata();
         meta.modId = "ccluajit";
         meta.name = "CCLuaJIT";
-        meta.description = "Changes ComputerCraft to use LuaJIT instead of LuaJ";
-        meta.version = CCLuaJIT.MC_VERSION + "-" + CCLuaJIT.CCLJ_VERSION;
+        meta.description = "Changes ComputerCraft to use LuaJIT instead of LuaJ. Special thanks to Mike Pall for for LuaJIT, dan200 for ComputerCraft, and kkaylium for the logo!";
+        meta.logoFile = "/logo.png";
+        meta.version = CCLuaJIT.CCLJ_VERSION;
         meta.authorList = Collections.singletonList("sci4me");
 
         try {
