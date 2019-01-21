@@ -310,15 +310,14 @@ public final class TaskScheduler {
             while(true) {
                 try {
                     this.input.await();
-                    try {
-                        this.task.execute();
-                    } catch(final Throwable t) {
-                        throw new RuntimeException("Error running task", t);
-                    }
-                    this.task = null;
-                    this.finished.signal();
+                    this.task.execute();
                 } catch(final InterruptedException ignored) {
                     this.task = null;
+                } catch(final Throwable t) {
+                    throw new RuntimeException("Error running task", t);
+                } finally {
+                    this.task = null;
+                    this.finished.signal();
                 }
             }
         }
