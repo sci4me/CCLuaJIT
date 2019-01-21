@@ -4,12 +4,16 @@ import com.sci.cclj.asm.CCLJClassTransformer;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.ModContainer;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Map;
 
 @IFMLLoadingPlugin.MCVersion(CCLuaJIT.MC_VERSION)
 @IFMLLoadingPlugin.TransformerExclusions({"com.sci.cclj"})
 public final class CCLuaJIT implements IFMLLoadingPlugin {
+    public static final Logger LOGGER = LogManager.getLogger("CCLuaJIT");
+
     public static final String CCLJ_VERSION = "$CCLJ_VERSION";
     public static final String MC_VERSION = "$MC_VERSION";
 
@@ -30,7 +34,7 @@ public final class CCLuaJIT implements IFMLLoadingPlugin {
 
     @Override
     public String getSetupClass() {
-        return null;
+        return CCLuaJITCallHook.class.getCanonicalName();
     }
 
     @Override
