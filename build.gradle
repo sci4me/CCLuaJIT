@@ -55,3 +55,23 @@ task buildDynamicLibrary(type: Exec) {
 }
 
 build.dependsOn buildDynamicLibrary
+
+task sign << {
+    def signedDir = new File(buildDir, "signed")
+    if (signedDir.exists()) signedDir.delete()
+    signedDir.mkdir()
+
+    ant.signjar(
+            alias: "signJar",
+            jar: jar.archivePath,
+            keystore: env.CCLJ_KEYSTORE_PATH,
+            storepass: env.CCLJ_KEYSTORE_PASSWORD,
+            keypass: env.CCLJ_KEYSTORE_PASSWORD,
+            destdir: "${signedDir.absolutePath}"
+    )
+}
+
+if (env.CCLJ_KEYSTORE_PATH != null && env.CCLJ_KEYSTORE_PASSWORD != null) {
+    sign.dependsOn reobf
+    build.dependsOn sign
+}

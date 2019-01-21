@@ -8,7 +8,7 @@ import java.security.cert.Certificate;
 import java.util.Map;
 
 public final class CCLuaJITCallHook implements IFMLCallHook {
-    private static final String CCLJ_FINGERPRINT = "9B:3C:8C:CD:BE:2B:6F:70:93:27:95:47:CC:67:28:D8:4F:53:38:E0".toLowerCase().replace(":", "");
+    public static final String CCLJ_FINGERPRINT = "9B:3C:8C:CD:BE:2B:6F:70:93:27:95:47:CC:67:28:D8:4F:53:38:E0".toLowerCase().replace(":", "");
 
     @Override
     public void injectData(final Map<String, Object> data) {
