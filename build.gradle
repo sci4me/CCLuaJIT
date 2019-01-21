@@ -54,7 +54,7 @@ task buildDynamicLibrary(type: Exec) {
     commandLine "./build-natives.sh"
 }
 
-assemble.dependsOn buildDynamicLibrary
+jar.dependsOn buildDynamicLibrary
 
 task sign << {
     def signedDir = new File(buildDir, "signed")
