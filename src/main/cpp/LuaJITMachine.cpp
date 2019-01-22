@@ -13,7 +13,7 @@ extern "C" {
 // Helper Macros
 //
 
-#define CCLJ_JNIVERSION JNI_VERSION_1_6
+#define CCLJ_JNIVERSION JNI_VERSION_1_8
 #define CCLJ_JNIEXPORT(rtype, name, ...) JNIEXPORT rtype JNICALL Java_com_sci_cclj_computer_LuaJITMachine_##name(JNIEnv *env, jobject obj, ##__VA_ARGS__)
 
 //
