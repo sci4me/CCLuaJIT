@@ -24,6 +24,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
 
 public final class LuaJITMachine implements ILuaMachine, ILuaContext {
+    private static final boolean FIX_STRING_METATABLES = true; // @TODO: un-hackify this
+
     private static final MethodHandle GET_UNIQUE_TASK_ID_MH;
     private static final MethodHandle QUEUE_TASK_MH;
 
@@ -154,10 +156,21 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
         try {
             final StringBuilder sb = new StringBuilder();
             final BufferedReader reader = new BufferedReader(new InputStreamReader(bios));
+            boolean skipping = false;
             String line;
             while((line = reader.readLine()) != null) {
-                sb.append(line);
-                sb.append('\n');
+                if(FIX_STRING_METATABLES) {
+                    if(line.startsWith("-- Prevent access to metatables or environments of strings")) {
+                        skipping = true;
+                    } else if(line.startsWith("-- Install lua parts of the os api")) {
+                        skipping = false;
+                    }
+                }
+
+                if(!skipping) {
+                    sb.append(line);
+                    sb.append('\n');
+                }
             }
 
             if(!this.loadBios(sb.toString())) {
