@@ -8,9 +8,10 @@ import dan200.computercraft.core.computer.ITask;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 // @TODO: can we limit the number of threads used? I thought there might be a reason we _CAN'T_ but .. maybe we can
+// @TODO: cancel all tasks when world unloads? or something similar
 
 public final class TaskScheduler {
     public static final TaskScheduler INSTANCE = new TaskScheduler();
@@ -126,7 +127,7 @@ public final class TaskScheduler {
                         }
                     } else {
                         final TaskExecutor taskExecutor = this.taskExecutorsToFinish.remove();
-                        this.finish(taskExecutor, taskExecutor.getTask());
+                        this.finish(taskExecutor);
                     }
                 }
             }
@@ -152,13 +153,12 @@ public final class TaskScheduler {
         }
     }
 
-    private void finish(final TaskExecutor taskExecutor, final ITask task) {
+    private void finish(final TaskExecutor taskExecutor) {
         if(taskExecutor == null) throw new IllegalArgumentException("taskExecutor is null");
-        if(task == null) throw new IllegalArgumentException("task is null");
 
         synchronized(this.lock) {
             if(taskExecutor == this.runningTaskExecutor || this.runningTaskExecutor == null) {
-                final BlockingQueue<ITask> queue = this.taskQueues.remove(task);
+                final BlockingQueue<ITask> queue = this.taskQueues.remove(taskExecutor.getTask());
 
                 if(queue.isEmpty()) {
                     this.computerTaskQueuesActiveSet.remove(queue);
@@ -166,7 +166,8 @@ public final class TaskScheduler {
                     this.computerTaskQueuesActive.add(queue);
                 }
 
-                taskExecutor.finishTask();
+                taskExecutor.retireTask();
+
                 this.taskExecutorCache.returnObject(taskExecutor);
                 this.runningTaskExecutor = null;
             } else {
@@ -180,22 +181,30 @@ public final class TaskScheduler {
     private static final class TaskExecutor {
         private static int id;
 
-        private final BiConsumer<TaskExecutor, ITask> onTaskComplete;
-        private final BinarySemaphore submit;
-        private final TaskRunner runner;
+        private final Consumer<TaskExecutor> onTaskComplete;
+        private final BinarySemaphore executorSubmit;
+        private final BinarySemaphore runnerSubmit;
+        private final BinarySemaphore runnerFinished;
+
+        private final Thread runnerThread;
 
         private final Object blockedInYieldLock = new Object();
         private boolean blockedInYield;
         private ITask task;
 
-        TaskExecutor(final BiConsumer<TaskExecutor, ITask> onTaskComplete) {
+        TaskExecutor(final Consumer<TaskExecutor> onTaskComplete) {
             this.onTaskComplete = onTaskComplete;
-            this.submit = new BinarySemaphore();
-            this.runner = new TaskRunner();
+            this.executorSubmit = new BinarySemaphore();
+            this.runnerSubmit = new BinarySemaphore();
+            this.runnerFinished = new BinarySemaphore();
 
-            final Thread thread = new Thread(this::run, "CCLJ-TaskScheduler-TaskExecutor-" + TaskExecutor.id++);
-            thread.setDaemon(true);
-            thread.start();
+            this.runnerThread = new Thread(this::run, "CCLJ-TaskScheduler-TaskRunner-" + TaskExecutor.id);
+            this.runnerThread.setDaemon(true);
+            this.runnerThread.start();
+
+            final Thread executorThread = new Thread(this::execute, "CCLJ-TaskScheduler-TaskExecutor-" + TaskExecutor.id++);
+            executorThread.setDaemon(true);
+            executorThread.start();
         }
 
         void block() {
@@ -223,36 +232,35 @@ public final class TaskScheduler {
             if(this.isUnavailable())
                 throw new IllegalStateException("Attempt to submit an ITask to a TaskExecutor that is unavailable");
             this.task = task;
-            this.submit.signal();
+            this.executorSubmit.signal();
         }
 
-        void finishTask() {
+        void retireTask() {
             this.task = null;
         }
 
-        void run() {
+        void execute() {
             try {
                 while(true) {
-                    this.submit.await();
-
-                    this.runner.submit(this.task);
+                    this.executorSubmit.await();
+                    this.runnerSubmit.signal();
 
                     try {
-                        boolean done = this.runner.await(7000);
+                        boolean done = this.runnerFinished.await(7000);
                         if(!done) {
                             final Computer computer = this.task.getOwner();
                             if(computer != null) {
                                 computer.abort(false);
 
-                                done = this.runner.await(1500);
+                                done = this.runnerFinished.await(1500);
                                 if(!done) {
                                     computer.abort(true);
-                                    done = this.runner.await(1500);
+                                    done = this.runnerFinished.await(1500);
                                 }
                             }
 
                             if(!done) {
-                                this.runner.interrupt();
+                                this.runnerThread.interrupt();
                             }
                         }
                     } finally {
@@ -263,61 +271,24 @@ public final class TaskScheduler {
                             }
                         }
 
-                        this.onTaskComplete.accept(this, this.task);
+                        this.onTaskComplete.accept(this);
                     }
                 }
             } catch(final InterruptedException e) {
                 e.printStackTrace();
             }
         }
-    }
-
-    private static final class TaskRunner {
-        private static int id;
-
-        private final Thread thread;
-        private final BinarySemaphore input;
-        private final BinarySemaphore finished;
-
-        private ITask task;
-
-        TaskRunner() {
-            this.input = new BinarySemaphore();
-            this.finished = new BinarySemaphore();
-
-            this.thread = new Thread(this::run, "CCLJ-TaskScheduler-TaskRunner-" + TaskRunner.id++);
-            thread.setDaemon(true);
-            thread.start();
-        }
-
-        void submit(final ITask task) {
-            if(this.task != null)
-                throw new IllegalStateException("Attempt to submit an ITask to a TaskRunner that is unavailable");
-            this.task = task;
-            this.input.signal();
-        }
-
-        boolean await(final long timeout) throws InterruptedException {
-            return this.finished.await(timeout);
-        }
-
-        void interrupt() {
-            this.task = null;
-            this.thread.interrupt();
-        }
 
         void run() {
             while(true) {
                 try {
-                    this.input.await();
+                    this.runnerSubmit.await();
+
                     this.task.execute();
-                } catch(final InterruptedException ignored) {
-                    this.task = null;
                 } catch(final Throwable t) {
                     throw new RuntimeException("Error running task", t);
                 } finally {
-                    this.task = null;
-                    this.finished.signal();
+                    this.runnerFinished.signal();
                 }
             }
         }
