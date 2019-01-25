@@ -1,6 +1,8 @@
 package com.sci.cclj.asm;
 
 public final class Constants {
+    // @TODO: better-ify this
+
     public static final String COMPUTER_CLASS = "dan200.computercraft.core.computer.Computer";
     public static final String COMPUTER_DESC = COMPUTER_CLASS.replace('.', '/');
     public static final String COMPUTERTHREAD_CLASS = "dan200.computercraft.core.computer.ComputerThread";
