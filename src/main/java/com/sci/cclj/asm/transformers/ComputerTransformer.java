@@ -72,20 +72,6 @@ public final class ComputerTransformer implements ITransformer {
 
         final MethodNode mn = mno.get();
 
-        final Optional<MethodInsnNode> insno = Arrays.stream(mn.instructions.toArray())
-                .filter(i -> i.getOpcode() == Opcodes.INVOKESTATIC)
-                .map(i -> (MethodInsnNode) i)
-                .filter(i -> i.name.equals("queueTask"))
-                .filter(i -> i.owner.equals(COMPUTERTHREAD_DESC))
-                .filter(i -> i.desc.equals(COMPUTERTHREAD_QUEUETASK_DESC))
-                .findFirst();
-
-        if(!insno.isPresent()) {
-            throw new RuntimeException("Call to queueTask not found!");
-        }
-
-        final MethodInsnNode insn = insno.get();
-
         final InsnList list = new InsnList();
         list.add(new VarInsnNode(Opcodes.ALOAD, 1));
         list.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PULLEVENTSCANNER_DESC, "isSpecialEvent", "(Ljava/lang/String;)Z", false));
@@ -99,6 +85,6 @@ public final class ComputerTransformer implements ITransformer {
         list.add(new InsnNode(Opcodes.RETURN));
         list.add(label);
 
-        mn.instructions.insertBefore(mn.instructions.get(mn.instructions.indexOf(insn) - 2), list);
+        mn.instructions.insertBefore(mn.instructions.get(0), list);
     }
 }
