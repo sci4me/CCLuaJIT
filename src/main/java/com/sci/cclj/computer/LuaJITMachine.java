@@ -302,7 +302,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
                     try {
                         this.yieldResultsSignal.wait();
                     } catch(final InterruptedException e) {
-                        e.printStackTrace();
+                        e.printStackTrace(); // @TODO: what are we to do here?
                     }
                 }
             }

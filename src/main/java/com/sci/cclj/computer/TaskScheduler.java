@@ -10,7 +10,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
 
-// @TODO: can we limit the number of threads used? I thought there might be a reason we _CAN'T_ but .. maybe we can
 // @TODO: cancel all tasks when world unloads? or something similar
 
 public final class TaskScheduler {
@@ -180,17 +179,18 @@ public final class TaskScheduler {
 
     private static final class TaskExecutor {
         private static int id;
+        private static int runnerID;
 
         private final Consumer<TaskExecutor> onTaskComplete;
         private final BinarySemaphore executorSubmit;
         private final BinarySemaphore runnerSubmit;
         private final BinarySemaphore runnerFinished;
 
-        private final Thread runnerThread;
-
         private final Object blockedInYieldLock = new Object();
         private boolean blockedInYield;
         private ITask task;
+
+        private Thread runnerThread;
 
         TaskExecutor(final Consumer<TaskExecutor> onTaskComplete) {
             this.onTaskComplete = onTaskComplete;
@@ -198,11 +198,7 @@ public final class TaskScheduler {
             this.runnerSubmit = new BinarySemaphore();
             this.runnerFinished = new BinarySemaphore();
 
-            this.runnerThread = new Thread(this::run, "CCLJ-TaskScheduler-TaskRunner-" + TaskExecutor.id);
-            this.runnerThread.setDaemon(true);
-            this.runnerThread.start();
-
-            final Thread executorThread = new Thread(this::execute, "CCLJ-TaskScheduler-TaskExecutor-" + TaskExecutor.id++);
+            final Thread executorThread = new Thread(this::execute, "CCLJ-TaskScheduler-TaskExecutorController-" + TaskExecutor.id++);
             executorThread.setDaemon(true);
             executorThread.start();
         }
@@ -242,6 +238,12 @@ public final class TaskScheduler {
         void execute() {
             try {
                 while(true) {
+                    if(this.runnerThread == null) {
+                        this.runnerThread = new Thread(this::run, "CCLJ-TaskScheduler-TaskExecutor-" + TaskExecutor.runnerID++);
+                        this.runnerThread.setDaemon(true);
+                        this.runnerThread.start();
+                    }
+
                     this.executorSubmit.await();
                     this.runnerSubmit.signal();
 
@@ -261,6 +263,7 @@ public final class TaskScheduler {
 
                             if(!done) {
                                 this.runnerThread.interrupt();
+                                this.runnerThread = null;
                             }
                         }
                     } finally {
@@ -274,8 +277,8 @@ public final class TaskScheduler {
                         this.onTaskComplete.accept(this);
                     }
                 }
-            } catch(final InterruptedException e) {
-                e.printStackTrace();
+            } catch(final InterruptedException ignored) {
+                Thread.currentThread().interrupt();
             }
         }
 
@@ -284,9 +287,13 @@ public final class TaskScheduler {
                 try {
                     this.runnerSubmit.await();
 
-                    this.task.execute();
+                    this.task.execute(); // @TODO: data race! task is null when a special yield gets interrupted, or something
+                } catch(final InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    break;
                 } catch(final Throwable t) {
-                    throw new RuntimeException("Error running task", t);
+                    System.out.println("ComputerCraft: Error running task.");
+                    t.printStackTrace();
                 } finally {
                     this.runnerFinished.signal();
                 }
