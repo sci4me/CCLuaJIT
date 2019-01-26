@@ -11,6 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
 
 // @TODO: cancel all tasks when world unloads? or something similar
+// @TODO: only spawn new executors when all existing executors are blocked?
 
 public final class TaskScheduler {
     public static final TaskScheduler INSTANCE = new TaskScheduler();
@@ -283,20 +284,23 @@ public final class TaskScheduler {
         }
 
         void run() {
-            while(true) {
-                try {
+            try {
+                while(true) {
                     this.runnerSubmit.await();
 
-                    this.task.execute(); // @TODO: data race! task is null when a special yield gets interrupted, or something
-                } catch(final InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch(final Throwable t) {
-                    System.out.println("ComputerCraft: Error running task.");
-                    t.printStackTrace();
-                } finally {
+                    try {
+                        this.task.execute();
+                    } catch(final RuntimeException e) {
+                        System.out.println("ComputerCraft: Error running task.");
+                        e.printStackTrace();
+                    }
+
                     this.runnerFinished.signal();
                 }
+            } catch(final InterruptedException e) {
+                System.out.println("ComputerCraft: Error running task.");
+                e.printStackTrace();
+                Thread.currentThread().interrupt();
             }
         }
     }

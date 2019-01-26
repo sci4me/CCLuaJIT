@@ -266,7 +266,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     }
 
     @Override
-    public Object[] pullEvent(final String filter) throws LuaException {
+    public Object[] pullEvent(final String filter) throws LuaException, InterruptedException {
         final Object[] results = this.pullEventRaw(filter);
         if(results.length > 0 && results[0].equals("terminate")) {
             throw new LuaException("Terminated", 0);
@@ -275,12 +275,12 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     }
 
     @Override
-    public Object[] pullEventRaw(final String filter) {
+    public Object[] pullEventRaw(final String filter) throws InterruptedException {
         return this.yield(new Object[]{filter});
     }
 
     @Override
-    public Object[] yield(final Object[] arguments) {
+    public Object[] yield(final Object[] arguments) throws InterruptedException {
         if(arguments.length > 0 && arguments[0] instanceof String) {
             final String filter = (String) arguments[0];
 
@@ -299,11 +299,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
                 }
 
                 synchronized(this.yieldResultsSignal) {
-                    try {
-                        this.yieldResultsSignal.wait();
-                    } catch(final InterruptedException e) {
-                        e.printStackTrace(); // @TODO: what are we to do here?
-                    }
+                    this.yieldResultsSignal.wait();
                 }
             }
         } else {
@@ -312,7 +308,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     }
 
     @Override
-    public Object[] executeMainThreadTask(final ILuaTask task) throws LuaException {
+    public Object[] executeMainThreadTask(final ILuaTask task) throws LuaException, InterruptedException {
         final long id = this.issueMainThreadTask(task);
 
         while(true) {
