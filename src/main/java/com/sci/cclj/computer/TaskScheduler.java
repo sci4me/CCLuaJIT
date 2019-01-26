@@ -237,8 +237,8 @@ public final class TaskScheduler {
         }
 
         void execute() {
-            try {
-                while(true) {
+            while(true) {
+                try {
                     if(this.runnerThread == null) {
                         this.runnerThread = new Thread(this::run, "CCLJ-TaskScheduler-TaskExecutor-" + TaskExecutor.runnerID++);
                         this.runnerThread.setDaemon(true);
@@ -277,9 +277,9 @@ public final class TaskScheduler {
 
                         this.onTaskComplete.accept(this);
                     }
+                } catch(final InterruptedException ignored) {
+                    // @TODO: what are we to do here?
                 }
-            } catch(final InterruptedException ignored) {
-                Thread.currentThread().interrupt();
             }
         }
 
@@ -300,7 +300,6 @@ public final class TaskScheduler {
             } catch(final InterruptedException e) {
                 System.out.println("ComputerCraft: Error running task.");
                 e.printStackTrace();
-                Thread.currentThread().interrupt();
             }
         }
     }
