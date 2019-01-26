@@ -119,8 +119,8 @@ static jfieldID soft_abort_message_id = 0;
 static jfieldID hard_abort_message_id = 0;
 static jfieldID yield_requested_id = 0;
 
-static jclass lua_exception_class = 0;
-static jmethodID lua_exception_getmessage_id = 0;
+static jclass throwable_class = 0;
+static jmethodID exception_getmessage_id = 0;
 
 static jclass iluaobject_class = 0;
 static jmethodID get_method_names_id = 0;
@@ -418,10 +418,12 @@ static int invoke_java_fn(lua_State *L) {
     if(env->ExceptionCheck()) {
         jthrowable e = env->ExceptionOccurred();
 
-        if(env->IsInstanceOf(e, lua_exception_class)) {
+        if(env->IsInstanceOf(e, interruptedexception_class)) {
+            sysout("CAUGHT INTERRUPTED EXCEPTION FROM CALL TO JAVA METHOD");
+        } else {
             env->ExceptionClear();
 
-            jstring message = (jstring) env->CallObjectMethod(e, lua_exception_getmessage_id);
+            jstring message = (jstring) env->CallObjectMethod(e, exception_getmessage_id);
             if(message) {
                 const char *messagec = env->GetStringUTFChars(message, JNI_FALSE);
                 luaL_error(L, messagec);
@@ -688,8 +690,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
         return CCLJ_JNIVERSION;
     }
 
-    if(!(lua_exception_class = get_class_global_ref(env, "dan200/computercraft/api/lua/LuaException")) ||
-        !(lua_exception_getmessage_id = env->GetMethodID(lua_exception_class, "getMessage", "()Ljava/lang/String;"))) {
+    if(!(throwable_class = get_class_global_ref(env, "java/lang/Throwable")) ||
+        !(exception_getmessage_id = env->GetMethodID(throwable_class, "getMessage", "()Ljava/lang/String;"))) {
         return CCLJ_JNIVERSION;
     }
 
@@ -729,9 +731,9 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(identityhashmap_class)           env->DeleteGlobalRef(identityhashmap_class);
     if(interruptedexception_class)      env->DeleteGlobalRef(interruptedexception_class);
     if(machine_class)                   env->DeleteGlobalRef(machine_class);
-    if(lua_exception_class)             env->DeleteGlobalRef(lua_exception_class);
+    if(throwable_class)                 env->DeleteGlobalRef(throwable_class);
     if(iluaapi_class)                   env->DeleteGlobalRef(iluaapi_class);
-    if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class); 
+    if(iluaobject_class)                env->DeleteGlobalRef(iluaobject_class);
 }
 
 CCLJ_JNIEXPORT(jboolean, createLuaState, jstring cc_version, jstring mc_version, jlong random_seed) {
