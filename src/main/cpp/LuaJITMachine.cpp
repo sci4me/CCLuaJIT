@@ -121,7 +121,6 @@ static jfieldID yield_requested_id = 0;
 
 static jclass lua_exception_class = 0;
 static jmethodID lua_exception_getmessage_id = 0;
-static jmethodID lua_exception_getlevel_id = 0;
 
 static jclass iluaobject_class = 0;
 static jmethodID get_method_names_id = 0;
@@ -690,8 +689,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
     }
 
     if(!(lua_exception_class = get_class_global_ref(env, "dan200/computercraft/api/lua/LuaException")) ||
-        !(lua_exception_getmessage_id = env->GetMethodID(lua_exception_class, "getMessage", "()Ljava/lang/String;")) ||
-        !(lua_exception_getlevel_id = env->GetMethodID(lua_exception_class, "getLevel", "()I"))) {
+        !(lua_exception_getmessage_id = env->GetMethodID(lua_exception_class, "getMessage", "()Ljava/lang/String;"))) {
         return CCLJ_JNIVERSION;
     }
 
