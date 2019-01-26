@@ -249,24 +249,48 @@ public final class TaskScheduler {
                     this.runnerSubmit.signal();
 
                     try {
-                        boolean done = this.runnerFinished.await(7000);
-                        if(!done) {
-                            final Computer computer = this.task.getOwner();
-                            if(computer != null) {
-                                computer.abort(false);
+                        boolean done;
+                        do {
+                            done = this.runnerFinished.await(7000);
 
-                                done = this.runnerFinished.await(1500);
-                                if(!done) {
-                                    computer.abort(true);
-                                    done = this.runnerFinished.await(1500);
+                            synchronized(this.blockedInYieldLock) {
+                                if(this.blockedInYield) {
+                                    continue;
                                 }
                             }
 
                             if(!done) {
-                                this.runnerThread.interrupt();
-                                this.runnerThread = null;
+                                final Computer computer = this.task.getOwner();
+                                if(computer != null) {
+                                    computer.abort(false);
+
+                                    done = this.runnerFinished.await(1500);
+
+                                    synchronized(this.blockedInYieldLock) {
+                                        if(this.blockedInYield) {
+                                            continue;
+                                        }
+                                    }
+
+                                    if(!done) {
+                                        computer.abort(true);
+                                        done = this.runnerFinished.await(1500);
+                                    }
+                                }
+
+                                synchronized(this.blockedInYieldLock) {
+                                    if(this.blockedInYield) {
+                                        continue;
+                                    }
+                                }
+
+                                if(!done) {
+                                    this.runnerThread.interrupt();
+                                    this.runnerThread = null;
+                                    done = true;
+                                }
                             }
-                        }
+                        } while(!done);
                     } finally {
                         while(true) {
                             synchronized(this.blockedInYieldLock) {

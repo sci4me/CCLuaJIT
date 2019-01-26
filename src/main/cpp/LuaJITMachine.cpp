@@ -418,9 +418,7 @@ static int invoke_java_fn(lua_State *L) {
     if(env->ExceptionCheck()) {
         jthrowable e = env->ExceptionOccurred();
 
-        if(env->IsInstanceOf(e, interruptedexception_class)) {
-            sysout("CAUGHT INTERRUPTED EXCEPTION FROM CALL TO JAVA METHOD");
-        } else {
+        if(!env->IsInstanceOf(e, interruptedexception_class)) {
             env->ExceptionClear();
 
             jstring message = (jstring) env->CallObjectMethod(e, exception_getmessage_id);
