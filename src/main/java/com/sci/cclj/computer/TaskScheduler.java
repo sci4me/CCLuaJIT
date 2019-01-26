@@ -11,7 +11,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
 
 // @TODO: cancel all tasks when world unloads? or something similar
-// @TODO: only spawn new executors when all existing executors are blocked?
 
 public final class TaskScheduler {
     public static final TaskScheduler INSTANCE = new TaskScheduler();
