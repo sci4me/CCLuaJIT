@@ -421,6 +421,16 @@ static int invoke_java_fn(lua_State *L) {
         if(!env->IsInstanceOf(e, interruptedexception_class)) {
             env->ExceptionClear();
 
+            lua_Debug ar;
+            memset(&ar, 0, sizeof(lua_Debug));
+            if(lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar)) {
+                char buf[512];
+                sprintf(buf, "%s:%d: ", ar.short_src, ar.currentline);
+                lua_pushstring(L, buf);
+            } else {
+                lua_pushstring(L, "?:?: ");
+            }
+
             jstring message = (jstring) env->CallObjectMethod(e, exception_getmessage_id);
             if(message) {
                 const char *messagec = env->GetStringUTFChars(message, JNI_FALSE);
@@ -429,6 +439,8 @@ static int invoke_java_fn(lua_State *L) {
             } else {
                 lua_pushstring(L, "an unknown error occurred");
             }
+
+            lua_concat(L, 2);
 
             env->DeleteLocalRef(message);
             env->DeleteLocalRef(e);
