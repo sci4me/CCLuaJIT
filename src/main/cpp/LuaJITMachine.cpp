@@ -426,15 +426,14 @@ static int invoke_java_fn(lua_State *L) {
                 const char *messagec = env->GetStringUTFChars(message, JNI_FALSE);
                 lua_pushstring(L, messagec);
                 env->ReleaseStringUTFChars(message, messagec);
-                return lua_error(L);
             } else {
-                luaL_error(L, "an unknown error occurred");
+                lua_pushstring(L, "an unknown error occurred");
             }
 
             env->DeleteLocalRef(message);
             env->DeleteLocalRef(e);
 
-            return 0;
+            return lua_error(L);
         }
 
         env->DeleteLocalRef(e);
