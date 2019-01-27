@@ -6,7 +6,6 @@ public final class Constants {
     public static final String COMPUTER_CLASS = "dan200.computercraft.core.computer.Computer";
     public static final String COMPUTER_DESC = COMPUTER_CLASS.replace('.', '/');
     public static final String COMPUTERTHREAD_CLASS = "dan200.computercraft.core.computer.ComputerThread";
-    public static final String COMPUTERTHREAD_DESC = COMPUTERTHREAD_CLASS.replace('.', '/');
     public static final String ILUAMACHINE_DESC = "dan200/computercraft/core/lua/ILuaMachine";
     public static final String LUAJ_MACHINE_DESC = "dan200/computercraft/core/lua/LuaJLuaMachine";
 
@@ -14,7 +13,6 @@ public final class Constants {
     public static final String TASKSCHEDULER_DESC = "com/sci/cclj/computer/TaskScheduler";
     public static final String PULLEVENTSCANNER_DESC = "com/sci/cclj/asm/transformers/PullEventScanner";
 
-    public static final String COMPUTERTHREAD_QUEUETASK_DESC = "(Ldan200/computercraft/core/computer/ITask;Ldan200/computercraft/core/computer/Computer;)V";
     public static final String ILUAMACHINE_HANDLEEVENT_DESC = "(Ljava/lang/String;[Ljava/lang/Object;)V";
 
     public static final String ILUACONTEXT_DESC = "dan200/computercraft/api/lua/ILuaContext";
