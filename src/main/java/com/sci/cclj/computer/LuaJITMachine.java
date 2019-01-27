@@ -19,6 +19,7 @@ import java.io.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
@@ -97,6 +98,10 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
 
         System.load(luajitFile.getAbsolutePath());
         System.load(ccljFile.getAbsolutePath());
+    }
+
+    public static String decodeString(final byte[] bytes) {
+        return new String(bytes, StandardCharsets.US_ASCII);
     }
 
     public final Computer computer;

@@ -113,6 +113,7 @@ static jclass interruptedexception_class = 0;
 static jmethodID interruptedexception_init_id = 0;
 
 static jclass machine_class = 0;
+static jmethodID decode_string_id = 0;
 static jfieldID lua_state_id = 0;
 static jfieldID main_routine_id = 0;
 static jfieldID soft_abort_message_id = 0;
@@ -332,9 +333,16 @@ static jobject to_java_value(JNIEnv *env, lua_State *L) {
             return env->CallStaticObjectMethod(boolean_class, boolean_valueof_id, b);
         }
         case LUA_TSTRING: {
-            const char *cstr = lua_tostring(L, -1);
-            jstring result = env->NewStringUTF(cstr);
+            size_t len;
+            const char *cstr = lua_tolstring(L, -1, &len);
+
+            jbyteArray bytes = env->NewByteArray(len);
+            env->SetByteArrayRegion(bytes, 0, len, (jbyte*) cstr);
+
+            jobject result = env->CallStaticObjectMethod(machine_class, decode_string_id, bytes);
+
             lua_pop(L, 1);
+
             return result;
         }
         case LUA_TTABLE:
@@ -692,6 +700,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
     }
 
     if(!(machine_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaJITMachine")) ||
+        !(decode_string_id = env->GetStaticMethodID(machine_class, "decodeString", "([B)Ljava/lang/String;")) ||
         !(lua_state_id = env->GetFieldID(machine_class, "luaState", "J")) ||
         !(main_routine_id = env->GetFieldID(machine_class, "mainRoutine", "J")) ||
         !(soft_abort_message_id = env->GetFieldID(machine_class, "softAbortMessage", "Ljava/lang/String;")) ||
