@@ -424,8 +424,9 @@ static int invoke_java_fn(lua_State *L) {
             jstring message = (jstring) env->CallObjectMethod(e, exception_getmessage_id);
             if(message) {
                 const char *messagec = env->GetStringUTFChars(message, JNI_FALSE);
-                luaL_error(L, messagec);
+                lua_pushstring(L, messagec);
                 env->ReleaseStringUTFChars(message, messagec);
+                return lua_error(L);
             } else {
                 luaL_error(L, "an unknown error occurred");
             }
