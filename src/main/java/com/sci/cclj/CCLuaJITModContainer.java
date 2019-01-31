@@ -22,6 +22,7 @@ public final class CCLuaJITModContainer extends DummyModContainer {
         meta.logoFile = "/logo.png";
         meta.version = CCLuaJIT.CCLJ_VERSION;
         meta.authorList = Collections.singletonList("sci4me");
+        meta.url = "https://minecraft.curseforge.com/projects/ccluajit";
 
         try {
             meta.requiredMods.add(new DefaultArtifactVersion("ComputerCraft", VersionRange.createFromVersionSpec("[1.70,1.75]")));
