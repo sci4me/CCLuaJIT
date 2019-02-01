@@ -56,11 +56,6 @@ void set_lua_state(JNIEnv *env, jobject obj, lua_State *L);
 lua_State *get_main_routine(JNIEnv *env, jobject obj);
 void set_main_routine(JNIEnv *env, jobject obj, lua_State *L);
 
-void sysout(jobject obj);
-void sysout(const char *str);
-static void dump_stack_element(lua_State *L, int i);
-static void dump_stack(lua_State *L);
-
 //
 // Variables
 //
@@ -539,73 +534,6 @@ lua_State *get_main_routine(JNIEnv *env, jobject obj) {
 
 void set_main_routine(JNIEnv *env, jobject obj, lua_State *L) {
     env->SetLongField(obj, main_routine_id, (jlong) L);
-}
-
-void sysout(jobject obj) {
-    JNIEnv *env;
-    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        return;
-    }
-
-    jclass system = get_class_global_ref(env, "java/lang/System");
-    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
-    jobject out = env->GetStaticObjectField(system, outID);
-    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
-    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/Object;)V");
-    env->CallVoidMethod(out, printlnID, obj);
-
-    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
-    env->CallVoidMethod(out, flushID);
-}
-
-void sysout(const char *str) {
-    JNIEnv *env;
-    if(jvm->GetEnv((void**) &env, CCLJ_JNIVERSION) != JNI_OK) {
-        return;
-    }
-
-    jclass system = get_class_global_ref(env, "java/lang/System");
-    jfieldID outID = env->GetStaticFieldID(system, "out", "Ljava/io/PrintStream;");
-    jobject out = env->GetStaticObjectField(system, outID);
-    jclass printStream = get_class_global_ref(env, "java/io/PrintStream");
-    jmethodID printlnID = env->GetMethodID(printStream, "println", "(Ljava/lang/String;)V");
-    jstring jstr = env->NewStringUTF(str);
-    env->CallVoidMethod(out, printlnID, jstr);
-
-    jmethodID flushID = env->GetMethodID(printStream, "flush", "()V");
-    env->CallVoidMethod(out, flushID);
-}
-
-static void dump_stack_element(lua_State *L, int i) {
-    char buf[32];
-
-    int top = lua_gettop(L);
-    int j = i - top - 1;
-    int t = lua_type(L, i);
-    switch (t) {
-        case LUA_TSTRING:
-            sprintf(buf, "%i (%i)  '%s'", i, j, lua_tostring(L, i));
-            break;
-        case LUA_TBOOLEAN:
-            sprintf(buf, "%i (%i)  %s", i, j, lua_toboolean(L, i) ? "true" : "false");
-            break;
-        case LUA_TNUMBER:
-            sprintf(buf, "%i (%i)  %g", i, j, lua_tonumber(L, i));
-            break;
-        default:
-            sprintf(buf, "%i (%i)  %s", i, j, lua_typename(L, t));
-            break;
-    }
-    sysout(buf);
-}
-
-static void dump_stack(lua_State *L) {
-    sysout("stack: [");
-    int top = lua_gettop(L);
-    for (int i = top; i > 0; i--) {
-        dump_stack_element(L, i);
-    }
-    sysout("]");
 }
 
 //
