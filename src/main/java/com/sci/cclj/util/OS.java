@@ -8,11 +8,11 @@ public enum OS {
 
     public static OS check() {
         final String os = System.getProperty("os.name").toLowerCase();
-        if(os.contains("win")) {
+        if (os.contains("win")) {
             return OS.WINDOWS;
-        } else if(os.contains("mac")) {
+        } else if (os.contains("mac")) {
             return OS.OSX;
-        } else if(os.contains("nux") || os.contains("nix")) {
+        } else if (os.contains("nux") || os.contains("nix")) {
             return OS.LINUX;
         } else {
             return OS.OTHER;

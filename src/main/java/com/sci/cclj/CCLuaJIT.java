@@ -1,49 +1,34 @@
 package com.sci.cclj;
 
-import com.sci.cclj.asm.CCLJClassTransformer;
-import cpw.mods.fml.common.FMLCommonHandler;
-import cpw.mods.fml.common.ModContainer;
-import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.minecraftforge.fml.ModContainer;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.common.Mod;
 
-import java.util.Map;
+import java.util.Optional;
 
-@IFMLLoadingPlugin.MCVersion(CCLuaJIT.MC_VERSION)
-@IFMLLoadingPlugin.TransformerExclusions({"com.sci.cclj"})
-public final class CCLuaJIT implements IFMLLoadingPlugin {
-    public static final Logger LOGGER = LogManager.getLogger("CCLuaJIT");
+@Mod(CCLuaJIT.MOD_ID)
+public final class CCLuaJIT {
+    public static final String MOD_ID = "ccluajit";
 
-    public static final String CCLJ_VERSION = "$CCLJ_VERSION";
-    public static final String MC_VERSION = "$MC_VERSION";
+    public CCLuaJIT() {
+    }
+
+    public static String getMinecraftVersion() {
+        // NOTE TODO: Can this be done better? Probably, but yknow. gdasjlgw
+        final Optional<? extends ModContainer> oc = ModList.get().getModContainerById("minecraft");
+        if (oc.isPresent()) {
+            final ModContainer c = oc.get();
+            return c.getModInfo().getVersion().toString();
+        }
+        throw new RuntimeException("Failed to retrieve ModContainer for '" + MOD_ID + "'");
+    }
 
     public static String getInstalledComputerCraftVersion() {
-        final ModContainer mc = FMLCommonHandler.instance().findContainerFor("ComputerCraft");
-        return mc.getVersion();
-    }
-
-    @Override
-    public String[] getASMTransformerClass() {
-        return new String[]{CCLJClassTransformer.class.getCanonicalName()};
-    }
-
-    @Override
-    public String getModContainerClass() {
-        return CCLuaJITModContainer.class.getCanonicalName();
-    }
-
-    @Override
-    public String getSetupClass() {
-        return CCLuaJITCallHook.class.getCanonicalName();
-    }
-
-    @Override
-    public void injectData(final Map<String, Object> data) {
-
-    }
-
-    @Override
-    public String getAccessTransformerClass() {
-        return null;
+        final Optional<? extends ModContainer> oc = ModList.get().getModContainerById("computercraft");
+        if (oc.isPresent()) {
+            final ModContainer c = oc.get();
+            return c.getModInfo().getVersion().toString();
+        }
+        throw new RuntimeException("Failed to retrieve ModContainer for 'computercraft'");
     }
 }

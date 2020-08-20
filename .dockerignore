@@ -6,8 +6,7 @@
 *.ipr
 *.iws
 
-build-image.sh
-build-natives.sh
+build_natives.sh
 
 README.md
 LICENSE

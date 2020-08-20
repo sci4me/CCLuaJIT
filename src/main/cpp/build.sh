@@ -8,5 +8,6 @@ make TARGET_SYS=Linux
 echo "# Building Windows natives..."
 make TARGET_SYS=Windows
 
-echo "# Building OSX natives..."
-make TARGET_SYS=OSX
+# TODO
+# echo "# Building OSX natives..."
+# make TARGET_SYS=OSX

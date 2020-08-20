@@ -4,53 +4,46 @@ import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimaps;
 import com.sci.cclj.CCLuaJIT;
-import com.sci.cclj.asm.transformers.PullEventScanner;
 import com.sci.cclj.util.OS;
+import dan200.computercraft.ComputerCraft;
+import dan200.computercraft.api.lua.ILuaAPI;
 import dan200.computercraft.api.lua.ILuaContext;
 import dan200.computercraft.api.lua.ILuaTask;
 import dan200.computercraft.api.lua.LuaException;
-import dan200.computercraft.core.apis.ILuaAPI;
 import dan200.computercraft.core.computer.Computer;
-import dan200.computercraft.core.computer.ITask;
+import dan200.computercraft.core.computer.MainThread;
+import dan200.computercraft.core.computer.TimeoutState;
 import dan200.computercraft.core.lua.ILuaMachine;
+import dan200.computercraft.core.lua.MachineResult;
 import org.apache.commons.io.IOUtils;
 
-import java.io.*;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
 
 public final class LuaJITMachine implements ILuaMachine, ILuaContext {
-    private static final boolean FIX_STRING_METATABLES = true; // @TODO: un-hackify this
+    @SuppressWarnings("unused") // Used in native code.
+    public static String decodeString(final byte[] bytes) {
+        return new String(bytes, StandardCharsets.US_ASCII);
+    }
 
-    private static final MethodHandle GET_UNIQUE_TASK_ID_MH;
-    private static final MethodHandle QUEUE_TASK_MH;
+    public static boolean isSpecialEvent(final String evt) {
+        if(evt == null) return false;
+        return evt.equals("turtle_response") || evt.equals("task_completed");
+    }
 
     static {
         try {
             LuaJITMachine.loadNatives();
-        } catch(final IOException e) {
+        } catch (final IOException e) {
             e.printStackTrace();
-        }
-
-        MethodHandle getUniqueTaskID_mh = null;
-        MethodHandle queueTask_mh = null;
-        try {
-            final Class<?> MAIN_THREAD_CLASS = Class.forName("dan200.computercraft.core.computer.MainThread");
-            final Class<?> iTask_class = Class.forName("dan200.computercraft.core.computer.ITask");
-
-            final MethodHandles.Lookup lookup = MethodHandles.lookup();
-            getUniqueTaskID_mh = lookup.findStatic(MAIN_THREAD_CLASS, "getUniqueTaskID", MethodType.methodType(long.class));
-            queueTask_mh = lookup.findStatic(MAIN_THREAD_CLASS, "queueTask", MethodType.methodType(boolean.class, iTask_class));
-        } catch(final ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
-            e.printStackTrace();
-        } finally {
-            GET_UNIQUE_TASK_ID_MH = getUniqueTaskID_mh;
-            QUEUE_TASK_MH = queueTask_mh;
         }
     }
 
@@ -73,7 +66,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     private static void loadNatives() throws IOException {
         final String libCCLJ;
         final String libLuaJIT;
-        switch(OS.check()) {
+        switch (OS.check()) {
             case WINDOWS:
                 libCCLJ = "cclj.dll";
                 libLuaJIT = "lua51.dll";
@@ -84,7 +77,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
                 break;
             case LINUX:
                 libCCLJ = "cclj.so";
-                libLuaJIT = "libluajit-5.1.so.2";
+                libLuaJIT = "libluajit-5.1.so";
                 break;
             default:
                 throw new RuntimeException(String.format("Unknown operating system: '%s'", System.getProperty("os.name")));
@@ -100,210 +93,143 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
         System.load(ccljFile.getAbsolutePath());
     }
 
-    public static String decodeString(final byte[] bytes) {
-        return new String(bytes, StandardCharsets.US_ASCII);
-    }
-
     public final Computer computer;
+    public final TimeoutState timeout;
 
-    private final Object yieldResultsSignal = new Object();
-    private final ListMultimap<String, Object[]> yieldResults;
-
-    private long luaState;
-    private long mainRoutine;
+    @SuppressWarnings("unused") // Used in native code.
+    private long machine;
 
     private String eventFilter;
-    private volatile String hardAbortMessage; // @TODO: Do we really need to differentiate hard and soft any more?
-    private volatile String softAbortMessage;
 
-    private volatile boolean yieldRequested;
+    private boolean yielded;
+    private final ListMultimap<String, Object[]> yieldResults = Multimaps.synchronizedListMultimap(LinkedListMultimap.create());
+    private final Object yieldResultsSignal = new Object();
 
-    public LuaJITMachine(final Computer computer) {
+    private volatile boolean aborted;
+
+    public LuaJITMachine(final Computer computer, final TimeoutState timeout) {
         this.computer = computer;
+        this.timeout = timeout;
 
-        this.yieldResults = Multimaps.synchronizedListMultimap(LinkedListMultimap.create());
-
-        if(!this.createLuaState(CCLuaJIT.getInstalledComputerCraftVersion(), CCLuaJIT.MC_VERSION, ThreadLocalRandom.current().nextLong())) {
-            throw new RuntimeException("Failed to create native Lua state");
+        if (!this.initMachine(
+                CCLuaJIT.getInstalledComputerCraftVersion(),
+                CCLuaJIT.getMinecraftVersion(),
+                computer.getAPIEnvironment().getComputerEnvironment().getHostString(),
+                ComputerCraft.default_computer_settings,
+                ThreadLocalRandom.current().nextLong())) {
+            throw new RuntimeException("Failed to initialize native state");
         }
     }
 
-    private native boolean createLuaState(final String ccVersion, final String mcVersion, final long randomSeed);
+    private native boolean initMachine(final String cctVersion, final String mcVersion, final String host, final String defaultSettings, final long randomSeed);
 
-    private native void destroyLuaState();
+    private native void deinitMachine();
 
     private native boolean registerAPI(final ILuaAPI api);
 
     private native boolean loadBios(final String bios);
 
-    private native Object[] resumeMainRoutine(final Object[] arguments) throws InterruptedException;
+    private native Object[] handleEvent(final Object[] args);
 
-    private native void abort(); // @TODO: Can we just pass the string to this function to avoid needing REGISTER_KEY_MACHINE in LUA_REGISTRYINDEX
+    private native void abortMachine();
 
-    @Override
-    public void finalize() {
-        synchronized(this) {
-            this.unload();
-        }
+    public void abort() {
+        if(this.aborted) return;
+        this.aborted = true;
+        this.abortMachine();
     }
 
     @Override
-    public void addAPI(final ILuaAPI api) {
-        if(!this.registerAPI(api)) {
+    public void addAPI(@Nonnull final ILuaAPI api) {
+        if (!this.registerAPI(api)) {
             throw new RuntimeException("Failed to register API " + api);
         }
     }
 
     @Override
-    public void loadBios(final InputStream bios) {
-        if(this.mainRoutine != 0) return;
-
+    public MachineResult loadBios(@Nonnull final InputStream in) {
         try {
-            final StringBuilder sb = new StringBuilder();
-            final BufferedReader reader = new BufferedReader(new InputStreamReader(bios));
-            boolean skipping = false;
-            String line;
-            while((line = reader.readLine()) != null) {
-                if(FIX_STRING_METATABLES) {
-                    if(line.startsWith("-- Prevent access to metatables or environments of strings")) {
-                        skipping = true;
-                    } else if(line.startsWith("-- Install lua parts of the os api")) {
-                        skipping = false;
-                    }
-                }
+            final String bios = IOUtils.toString(in, StandardCharsets.UTF_8);
 
-                if(!skipping) {
-                    sb.append(line);
-                    sb.append('\n');
-                }
+            if (!this.loadBios(bios)) {
+                return MachineResult.GENERIC_ERROR;
             }
 
-            if(!this.loadBios(sb.toString())) {
-                throw new RuntimeException("Failed to create main routine");
-            }
-        } catch(final IOException e) {
-            e.printStackTrace();
+            return MachineResult.OK;
+        } catch (final IOException e) {
+            return MachineResult.error(e);
         }
     }
 
     @Override
-    public void handleEvent(final String eventName, final Object[] args) {
-        if(this.mainRoutine == 0) return;
+    public MachineResult handleEvent(@Nullable final String evt, @Nullable final Object[] args) {
+        if (this.machine == 0) return MachineResult.GENERIC_ERROR;
 
-        if(this.eventFilter == null || eventName == null || eventName.equals(this.eventFilter) || eventName.equals("terminate")) {
-            final Object[] arguments;
-            if(eventName == null) {
-                arguments = new Object[0];
-            } else if(args == null) {
-                arguments = new Object[]{eventName};
-            } else {
-                arguments = new Object[args.length + 1];
-                arguments[0] = eventName;
-                System.arraycopy(args, 0, arguments, 1, args.length);
-            }
-
-            if(PullEventScanner.isSpecialEvent(eventName)) {
-                this.yieldResults.put(eventName, arguments);
-                synchronized(this.yieldResultsSignal) {
-                    this.yieldResultsSignal.notifyAll();
-                }
-                return;
-            }
-
-            try {
-                final Object[] results = this.resumeMainRoutine(arguments);
-
-                if(this.hardAbortMessage != null) {
-                    this.destroyLuaState();
-                } else if(results.length > 0 && results[0] instanceof Boolean && !(Boolean) results[0]) {
-                    this.destroyLuaState();
-                } else {
-                    if(results.length >= 2 && results[1] instanceof String) {
-                        this.eventFilter = (String) results[1];
-                    } else {
-                        this.eventFilter = null;
-                    }
-                }
-            } catch(final InterruptedException e) {
-                this.destroyLuaState();
-            } finally {
-                this.softAbortMessage = null;
-                this.hardAbortMessage = null;
-            }
+        if (this.eventFilter != null && evt != null && !evt.equals(this.eventFilter) && !evt.equals("terminate")) {
+            return MachineResult.OK;
         }
-    }
 
-    private void abort(final boolean hard, final String abortMessage) {
-        this.softAbortMessage = abortMessage;
-        if(hard) this.hardAbortMessage = abortMessage;
-
-        this.abort();
-    }
-
-    @Override
-    public void softAbort(final String abortMessage) {
-        this.abort(false, abortMessage);
-    }
-
-    @Override
-    public void hardAbort(final String abortMessage) {
-        this.abort(true, abortMessage);
-    }
-
-    @Override
-    public boolean saveState(final OutputStream output) {
-        return false;
-    }
-
-    @Override
-    public boolean restoreState(final InputStream input) {
-        return false;
-    }
-
-    @Override
-    public boolean isFinished() {
-        return this.mainRoutine == 0;
-    }
-
-    @Override
-    public void unload() {
-        if(this.luaState != 0) this.destroyLuaState();
-    }
-
-    @Override
-    public Object[] pullEvent(final String filter) throws LuaException, InterruptedException {
-        final Object[] results = this.pullEventRaw(filter);
-        if(results.length > 0 && results[0].equals("terminate")) {
-            throw new LuaException("Terminated", 0);
+        final Object[] arguments;
+        if (evt == null) {
+            arguments = new Object[0];
+        } else if (args == null) {
+            arguments = new Object[]{evt};
+        } else {
+            arguments = new Object[args.length + 1];
+            arguments[0] = evt;
+            System.arraycopy(args, 0, arguments, 1, args.length);
         }
-        return results;
-    }
 
-    @Override
-    public Object[] pullEventRaw(final String filter) throws InterruptedException {
-        return this.yield(new Object[]{filter});
-    }
-
-    @Override
-    public Object[] yield(final Object[] arguments) throws InterruptedException {
-        if(arguments.length > 0 && arguments[0] instanceof String) {
-            final String filter = (String) arguments[0];
-
-            if(!PullEventScanner.isSpecialEvent(filter)) {
-                throw new RuntimeException("Attempt to call yield with an event filter that is not registered: '" + filter + "'");
+        if (LuaJITMachine.isSpecialEvent(evt)) {
+            this.yieldResults.put(evt, arguments);
+            synchronized (this.yieldResultsSignal) {
+                this.yieldResultsSignal.notify();
             }
+            return MachineResult.OK;
+        }
 
-            TaskScheduler.INSTANCE.notifyYieldEnter(this.computer);
-            while(true) {
-                if(this.yieldResults.containsKey(filter) && !this.yieldRequested) {
-                    this.yieldRequested = true;
-                    this.computer.queueEvent(null, null);
-                    final Object[] results = this.yieldResults.get(filter).remove(0);
-                    TaskScheduler.INSTANCE.notifyYieldExit(this.computer);
-                    return results;
+        this.timeout.refresh();
+        if(this.timeout.isSoftAborted()) this.abort();
+
+        final Object[] results = this.handleEvent(arguments);
+
+        if(this.timeout.isHardAborted()) {
+            this.close();
+            return MachineResult.TIMEOUT;
+        }
+
+        if (results == null) return MachineResult.PAUSE;
+
+        if (results.length > 0 && results[0] instanceof String) this.eventFilter = (String) results[0];
+        else this.eventFilter = null;
+
+        return MachineResult.OK;
+    }
+
+    @Override
+    public void close() {
+        if(this.machine == 0) return;
+        this.deinitMachine();
+    }
+
+    @Nonnull
+    @Override
+    public Object[] yield(@Nullable final Object[] args) throws InterruptedException {
+        if (this.yielded) {
+            throw new RuntimeException("yield is not reentrant!");
+        }
+
+        if (args != null && args.length > 0 && args[0] instanceof String) {
+            this.yielded = true;
+
+            final String filter = (String) args[0];
+            while (true) {
+                if(this.yieldResults.containsKey(filter)) {
+                    this.yielded = false;
+                    return this.yieldResults.get(filter).remove(0);
                 }
 
-                synchronized(this.yieldResultsSignal) {
+                synchronized (this.yieldResultsSignal) {
                     this.yieldResultsSignal.wait();
                 }
             }
@@ -313,18 +239,18 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     }
 
     @Override
-    public Object[] executeMainThreadTask(final ILuaTask task) throws LuaException, InterruptedException {
+    public Object[] executeMainThreadTask(@Nonnull final ILuaTask task) throws LuaException, InterruptedException {
         final long id = this.issueMainThreadTask(task);
 
-        while(true) {
+        while (true) {
             final Object[] response = this.pullEvent("task_complete");
-            if(response.length >= 3 && response[1] instanceof Number && response[2] instanceof Boolean && ((Number) response[1]).longValue() == id) {
-                if((Boolean) response[2]) {
+            if (response.length >= 3 && response[1] instanceof Number && response[2] instanceof Boolean && ((Number) response[1]).longValue() == id) {
+                if ((Boolean) response[2]) {
                     final Object[] returnValues = new Object[response.length - 3];
                     System.arraycopy(response, 3, returnValues, 0, returnValues.length);
                     return returnValues;
                 } else {
-                    if(response.length >= 4 && response[3] instanceof String) {
+                    if (response.length >= 4 && response[3] instanceof String) {
                         throw new LuaException((String) response[3]);
                     } else {
                         throw new LuaException();
@@ -335,46 +261,30 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     }
 
     @Override
-    public long issueMainThreadTask(final ILuaTask luaTask) {
-        try {
-            final long id = (long) GET_UNIQUE_TASK_ID_MH.invoke();
-            final ITask task = new ITask() {
-                @Override
-                public Computer getOwner() {
-                    return LuaJITMachine.this.computer;
+    public long issueMainThreadTask(@Nonnull final ILuaTask task) throws LuaException {
+        final long id = MainThread.getUniqueTaskID();
+        this.computer.queueMainThread(() -> {
+            try {
+                final Object[] results = task.execute();
+                if (results == null) {
+                    LuaJITMachine.this.taskCompleted(id, true);
+                } else {
+                    LuaJITMachine.this.taskCompleted(id, true, results);
                 }
-
-                @Override
-                public void execute() {
-                    try {
-                        final Object[] results = luaTask.execute();
-                        if(results == null) {
-                            this.respond(true);
-                        } else {
-                            this.respond(true, results);
-                        }
-                    } catch(final LuaException e) {
-                        this.respond(false, e.getMessage());
-                    } catch(final Throwable t) {
-                        this.respond(false, String.format("Java Exception Thrown: %s", t.toString()));
-                    }
-                }
-
-                private void respond(final boolean result, final Object... args) {
-                    final Object[] arguments = new Object[args.length + 2];
-                    arguments[0] = id;
-                    arguments[1] = result;
-                    System.arraycopy(args, 0, arguments, 2, args.length);
-                    LuaJITMachine.this.computer.queueEvent("task_complete", arguments);
-                }
-            };
-            if((Boolean) QUEUE_TASK_MH.invoke(task)) {
-                return id;
-            } else {
-                throw new LuaException("Task limit exceeded");
+            } catch (final LuaException e) {
+                LuaJITMachine.this.taskCompleted(id, false, e.getMessage());
+            } catch (final Throwable t) {
+                LuaJITMachine.this.taskCompleted(id, false, String.format("Java Exception Thrown: %s", t.toString()));
             }
-        } catch(final Throwable t) {
-            throw new RuntimeException(t);
-        }
+        });
+        return id;
+    }
+
+    private void taskCompleted(final long id, final boolean result, final Object... args) {
+        final Object[] arguments = new Object[args.length + 2];
+        arguments[0] = id;
+        arguments[1] = result;
+        System.arraycopy(args, 0, arguments, 2, args.length);
+        LuaJITMachine.this.computer.queueEvent("task_complete", arguments);
     }
 }

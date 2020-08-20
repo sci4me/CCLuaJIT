@@ -1,77 +1,113 @@
 buildscript {
     repositories {
+        jcenter()
         mavenCentral()
         maven {
-            name = "forge"
-            url = "http://files.minecraftforge.net/maven"
-        }
-        maven {
-            name = "sonatype"
-            url = "https://oss.sonatype.org/content/repositories/snapshots/"
+            name "Forge"
+            url 'https://files.minecraftforge.net/maven'
         }
     }
     dependencies {
-        classpath 'net.minecraftforge.gradle:ForgeGradle:1.2-SNAPSHOT'
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+    }
+}
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'idea'
+
+
+version = mc_version + "-" + mod_version
+group = 'com.sci.cclj'
+archivesBaseName = 'CCLuaJIT'
+
+sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8'
+
+minecraft {
+    mappings channel: 'snapshot', version: "${mappings_version}"
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+
+            //property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                ccluajit {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                ccluajit {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+            args '--mod', 'ccluajit', '--all', '--output', file('src/generated/resources/')
+
+            mods {
+                ccluajit {
+                    source sourceSets.main
+                }
+            }
+        }
     }
 }
 
-apply plugin: 'forge'
-
-def env = System.getenv()
-
-if (env.BUILD_NUMBER != null) {
-    mod_version += "-" + env.BUILD_NUMBER
-} else {
-    mod_version += "-unknown"
+repositories {
+    maven {
+        name "SquidDev"
+        url "https://squiddev.cc/maven"
+    }
 }
 
-version = minecraft_version + "-" + mod_version
-group = "com.sci.cclj"
-archivesBaseName = "CCLuaJIT"
+dependencies {
+    minecraft 'net.minecraftforge:forge:' + mc_version + '-' + forge_version
 
-compileJava {
-    sourceCompatibility = 1.8
-    targetCompatibility = 1.8
-}
-
-minecraft {
-    version = minecraft_version + "-" + forge_version + "-" + minecraft_version
-    runDir = "run"
-
-    replaceIn "CCLuaJIT.java"
-    replace '$CCLJ_VERSION', mod_version
-    replace '$MC_VERSION', minecraft_version
+    implementation fg.deobf("org.squiddev:cc-tweaked-${mc_version}:${cct_version}")
 }
 
 jar {
     manifest {
-        attributes 'FMLCorePlugin': 'com.sci.cclj.CCLuaJIT'
-        attributes 'FMLCorePluginContainsMod': 'true'
+        attributes([
+          "Specification-Title": "CCLuaJIT",
+          "Specification-Vendor": "sci4me",
+          "Specification-Version": "1",
+          "Implementation-Title": project.name,
+          "Implementation-Version": "${mod_version}",
+          "Implementation-Vendor" :"sci4me",
+          "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
     }
 }
 
 task buildDynamicLibrary(type: Exec) {
-    commandLine "./build-natives.sh"
+    commandLine "./build_natives.sh"
 }
 
-jar.dependsOn buildDynamicLibrary
+processResources.dependsOn buildDynamicLibrary
 
-task sign << {
-    def signedDir = new File(buildDir, "signed")
-    if (signedDir.exists()) signedDir.delete()
-    signedDir.mkdir()
+processResources {
+    from(sourceSets.main.resources.srcDirs) {
+        include 'META-INF/mods.toml'
 
-    ant.signjar(
-            alias: "signJar",
-            jar: jar.archivePath,
-            keystore: env.CCLJ_KEYSTORE_PATH,
-            storepass: env.CCLJ_KEYSTORE_PASSWORD,
-            keypass: env.CCLJ_KEYSTORE_PASSWORD,
-            destdir: "${signedDir.absolutePath}"
-    )
-}
+        expand 'cct_version': cct_version, 'mod_version': mod_version, 'mc_version': mc_version, 'forge_version': forge_version
+    }
 
-if (env.CCLJ_KEYSTORE_PATH != null && env.CCLJ_KEYSTORE_PASSWORD != null) {
-    sign.dependsOn reobf
-    build.dependsOn sign
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'META-INF/mods.toml'
+    }
 }
