@@ -1,5 +1,7 @@
 modLoader="javafml"
 loaderVersion="[${forge_version},)"
+issueTrackerURL="https://github.com/sci4me/CCLuaJIT/issues"
+showAsResourcePack=false
 
 [[mods]]
 description="Changes CC:Tweaked to use LuaJIT instead of Cobalt."

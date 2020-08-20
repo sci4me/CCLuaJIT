@@ -21,12 +21,16 @@ public final class ComputerExecutorTransformer implements ITransformer<MethodNod
     @Nonnull
     @Override
     public MethodNode transform(final MethodNode n, final ITransformerVotingContext ctx) {
-        if (n.name.equals("createLuaMachine")) {
-            this.transformCreateLuaMachine(n);
-        } else if(n.name.equals("queueEvent")) {
-            this.transformQueueEvent(n);
-        } else if(n.name.equals("abort")) {
-            this.transformAbort(n);
+        switch (n.name) {
+            case "createLuaMachine":
+                this.transformCreateLuaMachine(n);
+                break;
+            case "queueEvent":
+                this.transformQueueEvent(n);
+                break;
+            case "abort":
+                this.transformAbort(n);
+                break;
         }
         return n;
     }
