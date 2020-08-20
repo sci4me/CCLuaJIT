@@ -1,38 +1,54 @@
 package com.sci.cclj.asm;
 
-import com.google.common.collect.Sets;
-import cpw.mods.modlauncher.api.ITransformer;
-import cpw.mods.modlauncher.api.ITransformerVotingContext;
-import cpw.mods.modlauncher.api.TransformerVoteResult;
+import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import javax.annotation.Nonnull;
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static com.sci.cclj.asm.Constants.*;
+import static com.sci.cclj.asm.Constants.CCLJ_MACHINE_DESC;
 
-public final class ComputerExecutorTransformer implements ITransformer<MethodNode> {
-    private static final String CLASS_NAME = "dan200.computercraft.core.computer.ComputerExecutor";
-    private static final String[] LABELS = new String[]{"CCLuaJIT_ComputerExecutorTransformer"};
+public final class LaunchPluginService implements ILaunchPluginService {
+    private static final EnumSet<Phase> YAY = EnumSet.of(Phase.BEFORE);
+    private static final EnumSet<Phase> NAY = EnumSet.noneOf(Phase.class);
 
-    @Nonnull
     @Override
-    public MethodNode transform(final MethodNode n, final ITransformerVotingContext ctx) {
-        switch (n.name) {
-            case "createLuaMachine":
-                this.transformCreateLuaMachine(n);
-                break;
-            case "queueEvent":
-                this.transformQueueEvent(n);
-                break;
-            case "abort":
-                this.transformAbort(n);
-                break;
+    public String name() {
+        return "CCLuaJIT_LaunchPluginService";
+    }
+
+    @Override
+    public EnumSet<Phase> handlesClass(final Type clazz, boolean empty) {
+        return empty ? NAY : YAY;
+    }
+
+    @Override
+    public boolean processClass(final Phase phase, final ClassNode cn, final Type clazz) {
+        // TODO: de-uglify this
+        if(cn.name.equals(COMPUTER_EXECUTOR_DESC)) {
+            int c = 0;
+            for(final MethodNode mn : cn.methods) {
+                switch (mn.name) {
+                    case "createLuaMachine":
+                        this.transformCreateLuaMachine(mn);
+                        c++;
+                        break;
+                    case "queueEvent":
+                        this.transformQueueEvent(mn);
+                        c++;
+                        break;
+                    case "abort":
+                        this.transformAbort(mn);
+                        c++;
+                        break;
+                }
+            }
+            if(c != 3) throw new RuntimeException("CCLuaJIT class transformation failed!");
+            return true;
         }
-        return n;
+        return false;
     }
 
     private void transformCreateLuaMachine(final MethodNode n) {
@@ -69,7 +85,7 @@ public final class ComputerExecutorTransformer implements ITransformer<MethodNod
         final LabelNode label = new LabelNode();
         list.add(new JumpInsnNode(Opcodes.IFEQ, label));
         list.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        list.add(new FieldInsnNode(Opcodes.GETFIELD, CLASS_NAME.replace('.', '/'), "machine", String.format("L%s;", ILUAMACHINE_DESC)));
+        list.add(new FieldInsnNode(Opcodes.GETFIELD, COMPUTER_EXECUTOR_DESC, "machine", String.format("L%s;", ILUAMACHINE_DESC)));
         list.add(new VarInsnNode(Opcodes.ALOAD, 1));
         list.add(new VarInsnNode(Opcodes.ALOAD, 2));
         list.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, ILUAMACHINE_DESC, "handleEvent", "(Ljava/lang/String;[Ljava/lang/Object;)Ldan200/computercraft/core/lua/MachineResult;", true));
@@ -99,38 +115,5 @@ public final class ComputerExecutorTransformer implements ITransformer<MethodNod
         final AbstractInsnNode original = mi.get();
         n.instructions.insert(original, rep);
         n.instructions.remove(original);
-    }
-
-    @Nonnull
-    @Override
-    public TransformerVoteResult castVote(final ITransformerVotingContext ctx) {
-        return TransformerVoteResult.YES;
-    }
-
-    @Nonnull
-    @Override
-    public Set<Target> targets() {
-        return Sets.newHashSet(
-                Target.targetMethod(
-                        CLASS_NAME,
-                        "createLuaMachine",
-                        "()Ldan200/computercraft/core/lua/ILuaMachine;"
-                ),
-                Target.targetMethod(
-                        CLASS_NAME,
-                        "queueEvent",
-                        "(Ljava/lang/String;[Ljava/lang/Object;)V"
-                ),
-                Target.targetMethod(
-                        CLASS_NAME,
-                        "abort",
-                        "()V"
-                )
-        );
-    }
-
-    @Override
-    public String[] labels() {
-        return LABELS;
     }
 }
