@@ -21,7 +21,7 @@ struct LuaJITMachine {
     lua_State *L;
     lua_State *main_routine;
 
-    bool init(JNIEnv *env, jobject obj, jstring cc_version, jstring mc_version, jstring host, jstring default_settings, jlong random_seed) {
+    bool init(JNIEnv *env, jobject obj, jstring cclj_version, jstring cc_version, jstring mc_version, jstring host, jstring default_settings, jlong random_seed) {
         this->obj = env->NewGlobalRef(obj);
 
         L = luaL_newstate();
@@ -40,6 +40,7 @@ struct LuaJITMachine {
         lua_setglobal(L, "__inext");
 
         #define SET_GLOBAL_STRING(key, value) { const char *s = env->GetStringUTFChars(value, JNI_FALSE); lua_pushstring(L, s); lua_setglobal(L, key); env->ReleaseStringUTFChars(value, s); }
+            SET_GLOBAL_STRING("_CCLJ_VERSION", cclj_version)
             SET_GLOBAL_STRING("_CC_VERSION", cc_version)
             SET_GLOBAL_STRING("_MC_VERSION", mc_version)
             SET_GLOBAL_STRING("_HOST", host)

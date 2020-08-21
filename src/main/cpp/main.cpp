@@ -271,12 +271,12 @@ extern "C" {
         // TODO: double-check these
     }
 
-    CCLJ_JNIEXPORT(jboolean, initMachine, jstring cc_version, jstring mc_version, jstring host, jstring default_settings, jlong random_seed) {
+    CCLJ_JNIEXPORT(jboolean, initMachine, jstring cclj_version, jstring cc_version, jstring mc_version, jstring host, jstring default_settings, jlong random_seed) {
         auto M = (LuaJITMachine*) calloc(1, sizeof(LuaJITMachine));
 
         if(!M) return false;
 
-        if(!M->init(env, obj, cc_version, mc_version, host, default_settings, random_seed)) {
+        if(!M->init(env, obj, cclj_version, cc_version, mc_version, host, default_settings, random_seed)) {
             free(M);
             return false;
         }

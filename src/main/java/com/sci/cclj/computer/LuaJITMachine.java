@@ -113,7 +113,8 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
         this.timeout = timeout;
 
         if (!this.initMachine(
-                CCLuaJIT.getInstalledComputerCraftVersion(),
+                CCLuaJIT.getCCLJVersion(),
+                CCLuaJIT.getComputerCraftVersion(),
                 CCLuaJIT.getMinecraftVersion(),
                 computer.getAPIEnvironment().getComputerEnvironment().getHostString(),
                 ComputerCraft.default_computer_settings,
@@ -122,7 +123,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
         }
     }
 
-    private native boolean initMachine(final String cctVersion, final String mcVersion, final String host, final String defaultSettings, final long randomSeed);
+    private native boolean initMachine(final String ccljVersion, final String cctVersion, final String mcVersion, final String host, final String defaultSettings, final long randomSeed);
 
     private native void deinitMachine();
 
