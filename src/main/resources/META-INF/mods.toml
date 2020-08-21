@@ -10,7 +10,7 @@ version="${mod_version}"
 displayName="CCLuaJIT"
 logoFile="logo.png"
 authors="sci4me"
-credits="Special thanks to Mike Pall for for LuaJIT, dan200 for ComputerCraft, SquidDev (and many others) for CC:Tweaked, and kkaylium for the logo!"
+credits="Special thanks to Mike Pall for LuaJIT, dan200 for ComputerCraft, SquidDev (and many others) for CC:Tweaked, and kkaylium for the logo!"
 
 [[dependencies.ccluajit]]
 	modId="forge"
