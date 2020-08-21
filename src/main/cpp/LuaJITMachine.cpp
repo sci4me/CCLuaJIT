@@ -46,7 +46,8 @@ struct LuaJITMachine {
             SET_GLOBAL_STRING("_CC_DEFAULT_SETTINGS", default_settings)
         #undef SET_GLOBAL_STRING
 
-        lua_pushstring(L, "Lua 5.1");
+        // NOTE: do we want to do this rather than "Lua 5.1"...?
+        lua_pushstring(L, "LuaJIT 2.1.0-beta3");
         lua_setglobal(L, "_VERSION");
 
         lua_pushnil(L);
