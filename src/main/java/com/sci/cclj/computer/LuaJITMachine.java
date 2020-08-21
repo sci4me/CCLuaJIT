@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
 
+@SuppressWarnings("unused") // Instantiated by bytecode injected into CC
 public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     @SuppressWarnings("unused") // Used in native code.
     public static String decodeString(final byte[] bytes) {

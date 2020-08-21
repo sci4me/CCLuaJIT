@@ -36,11 +36,10 @@ function initializeCoreMod() {
                     var insn = insns.get(i);
                     var op = insn.getOpcode();
 
-                    if(op == Opcode.NEW && insn.desc.equals(COBALT_MACHINE_DESC)) {
+                    if(op == Opcodes.NEW && insn.desc.equals(COBALT_MACHINE_DESC)) {
                         insn.desc = CCLJ_MACHINE_DESC;
                         replacedNew = true;
-                        continue;
-                    } else if(op == Opcode.INVOKESPECIAL) {
+                    } else if(op == Opcodes.INVOKESPECIAL) {
                         var expectedDesc = "(L" + COMPUTER_DESC + ";L" + TIMEOUT_STATE_DESC + ";)V";
                         if(insn.owner.equals(COBALT_MACHINE_DESC) &&
                                 insn.name.equals("<init>") &&
