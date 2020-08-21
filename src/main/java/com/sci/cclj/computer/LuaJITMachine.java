@@ -150,9 +150,10 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     @Override
     public MachineResult loadBios(@Nonnull final InputStream in) {
         try {
+            final String pre = IOUtils.toString(LuaJITMachine.class.getResource("/prebios.lua"), StandardCharsets.UTF_8);
             final String bios = IOUtils.toString(in, StandardCharsets.UTF_8);
 
-            if (!this.loadBios(bios)) {
+            if (!this.loadBios(pre + "\n" + bios)) {
                 return MachineResult.GENERIC_ERROR;
             }
 
