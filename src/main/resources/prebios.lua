@@ -1,3 +1,4 @@
 table.pack = function(...)
-    return { ..., n = select('#', ...) }
+    return { n = select("#", ...), ... }
 end
+table.unpack = unpack
