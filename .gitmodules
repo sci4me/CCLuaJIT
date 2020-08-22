@@ -1,0 +1,6 @@
+[submodule "vendor/luajit"]
+	path = vendor/luajit
+	url = https://github.com/LuaJIT/LuaJIT.git
+[submodule "vendor/jni-headers"]
+	path = vendor/jni-headers
+	url = https://github.com/sci4me/jni-headers.git
