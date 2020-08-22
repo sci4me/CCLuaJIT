@@ -98,6 +98,11 @@ struct JavaFN {
             //env->DeleteLocalRef(e);
         }
 
+        if(env->GetBooleanField(machine, yield_requested_id)) {
+            env->SetBooleanField(machine, yield_requested_id, 0);
+            lua_sethook(L, thread_yield_request_handler_hook, LUA_MASKCOUNT, 1);
+        }
+
         if(results) {
             to_lua_values(env, L, results, machine);
             return env->GetArrayLength(results);
@@ -109,6 +114,11 @@ struct JavaFN {
 
 
 extern "C" {
+    static void thread_yield_request_handler_hook(lua_State *L, lua_Debug *ar) {
+        lua_sethook(L, 0, 0, 0);
+        lua_yield(L, 0);
+    }
+
     static int invoke_java_fn(lua_State *L) {
         JavaFN *jfn = (JavaFN*) lua_touserdata(L, lua_upvalueindex(1));
         return jfn->invoke(L);

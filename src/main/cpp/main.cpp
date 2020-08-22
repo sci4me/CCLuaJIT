@@ -30,6 +30,7 @@ static jclass machine_class = 0;
 static jmethodID decode_string_id = 0;
 static jfieldID machine_id = 0;
 static jfieldID aborted_id = 0;
+static jfieldID yield_requested_id = 0;
 
 static jclass iluaobject_class = 0;
 static jmethodID get_method_names_id = 0;
@@ -137,7 +138,8 @@ extern "C" {
         if(!(machine_class = get_class_global_ref(env, "com/sci/cclj/computer/LuaJITMachine")) ||
             !(decode_string_id = env->GetStaticMethodID(machine_class, "decodeString", "([B)Ljava/lang/String;")) ||
             !(machine_id = env->GetFieldID(machine_class, "machine", "J")) ||
-            !(aborted_id = env->GetFieldID(machine_class, "aborted", "Z"))) {
+            !(aborted_id = env->GetFieldID(machine_class, "aborted", "Z")) ||
+            !(yield_requested_id = env->GetFieldID(machine_class, "yieldRequested", "Z"))) {
             return CCLJ_JNIVERSION;
         }
 
