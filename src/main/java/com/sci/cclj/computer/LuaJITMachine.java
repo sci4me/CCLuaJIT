@@ -97,16 +97,17 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
     public final Computer computer;
     public final TimeoutState timeout;
 
-    @SuppressWarnings("unused") // Used in native code.
-    private long machine;
-
     private String eventFilter;
 
     private boolean yielded;
     private final ListMultimap<String, Object[]> yieldResults = Multimaps.synchronizedListMultimap(LinkedListMultimap.create());
     private final Object yieldResultsSignal = new Object();
+    private volatile boolean yieldRequested;
 
     private volatile boolean aborted;
+
+    private volatile long luaState;
+    private volatile long mainRoutine;
 
     public LuaJITMachine(final Computer computer, final TimeoutState timeout) {
         this.computer = computer;
@@ -166,7 +167,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
 
     @Override
     public MachineResult handleEvent(@Nullable final String evt, @Nullable final Object[] args) {
-        if (this.machine == 0) return MachineResult.GENERIC_ERROR;
+        if (this.mainRoutine == 0) return MachineResult.GENERIC_ERROR;
 
         if (this.eventFilter != null && evt != null && !evt.equals(this.eventFilter) && !evt.equals("terminate")) {
             return MachineResult.OK;
@@ -211,7 +212,7 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
 
     @Override
     public void close() {
-        if(this.machine == 0) return;
+        if(this.luaState == 0) return;
         this.deinitMachine();
     }
 
@@ -227,7 +228,9 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
 
             final String filter = (String) args[0];
             while (true) {
-                if(this.yieldResults.containsKey(filter)) {
+                if(this.yieldResults.containsKey(filter) && !this.yieldRequested) {
+                    this.yieldRequested = true;
+                    this.computer.queueEvent(null, null);
                     this.yielded = false;
                     return this.yieldResults.get(filter).remove(0);
                 }
