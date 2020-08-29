@@ -688,7 +688,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     if(iterator_class)                  env->DeleteGlobalRef(iterator_class);
     if(identityhashmap_class)           env->DeleteGlobalRef(identityhashmap_class);
     if(throwable_class)                 env->DeleteGlobalRef(throwable_class);
-    if(interruptedexception_class)      env->DeleteGlobalRef(throwable_class);
+    if(interruptedexception_class)      env->DeleteGlobalRef(interruptedexception_class);
     // TODO: double-check these
 }
 
