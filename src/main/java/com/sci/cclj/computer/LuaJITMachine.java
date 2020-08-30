@@ -235,8 +235,12 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
                     return this.yieldResults.get(filter).remove(0);
                 }
 
-                synchronized (this.yieldResultsSignal) {
-                    this.yieldResultsSignal.wait();
+                try {
+                    synchronized (this.yieldResultsSignal) {
+                        this.yieldResultsSignal.wait();
+                    }
+                } catch(final InterruptedException ignored) {
+                    System.out.println("blocking yield interrupted! (so long and thanks for all the fish!)");
                 }
             }
         } else {
