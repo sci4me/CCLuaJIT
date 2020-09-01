@@ -1,23 +1,23 @@
 function initializeCoreMod() {
-    var COBALT_MACHINE_DESC         = "dan200/computercraft/core/lua/CobaltLuaMachine";
-    var COMPUTER_DESC               = "dan200/computercraft/core/computer/Computer";
-    var TIMEOUT_STATE_DESC          = "dan200/computercraft/core/computer/TimeoutState";
-    var ILUAMACHINE_DESC            = "dan200/computercraft/core/lua/ILuaMachine";
-    var COMPUTER_EXECUTOR_DESC      = "dan200/computercraft/core/computer/ComputerExecutor";
-    var COMPUTER_EXECUTOR_NAME      = COMPUTER_EXECUTOR_DESC.replace("/", ".");
+    const COBALT_MACHINE_DESC         = "dan200/computercraft/core/lua/CobaltLuaMachine";
+    const COMPUTER_DESC               = "dan200/computercraft/core/computer/Computer";
+    const TIMEOUT_STATE_DESC          = "dan200/computercraft/core/computer/TimeoutState";
+    const ILUAMACHINE_DESC            = "dan200/computercraft/core/lua/ILuaMachine";
+    const COMPUTER_EXECUTOR_DESC      = "dan200/computercraft/core/computer/ComputerExecutor";
+    const COMPUTER_EXECUTOR_NAME      = COMPUTER_EXECUTOR_DESC.replace("/", ".");
 
-    var CCLJ_MACHINE_DESC           = "com/sci/cclj/computer/LuaJITMachine";
+    const CCLJ_MACHINE_DESC           = "com/sci/cclj/computer/LuaJITMachine";
 
-    var ASM                         = Java.type("net.minecraftforge.coremod.api.ASMAPI");
-    var Opcodes                     = Java.type("org.objectweb.asm.Opcodes");
-    var InsnList                    = Java.type("org.objectweb.asm.tree.InsnList");
-    var InsnNode                    = Java.type("org.objectweb.asm.tree.InsnNode");
-    var LabelNode                   = Java.type("org.objectweb.asm.tree.LabelNode");
-    var VarInsnNode                 = Java.type("org.objectweb.asm.tree.VarInsnNode");
-    var JumpInsnNode                = Java.type("org.objectweb.asm.tree.JumpInsnNode");
-    var MethodInsnNode              = Java.type("org.objectweb.asm.tree.MethodInsnNode");
-    var FieldInsnNode               = Java.type("org.objectweb.asm.tree.FieldInsnNode");
-    var TypeInsnNode                = Java.type("org.objectweb.asm.tree.TypeInsnNode");
+    const ASM                         = Java.type("net.minecraftforge.coremod.api.ASMAPI");
+    const Opcodes                     = Java.type("org.objectweb.asm.Opcodes");
+    const InsnList                    = Java.type("org.objectweb.asm.tree.InsnList");
+    const InsnNode                    = Java.type("org.objectweb.asm.tree.InsnNode");
+    const LabelNode                   = Java.type("org.objectweb.asm.tree.LabelNode");
+    const VarInsnNode                 = Java.type("org.objectweb.asm.tree.VarInsnNode");
+    const JumpInsnNode                = Java.type("org.objectweb.asm.tree.JumpInsnNode");
+    const MethodInsnNode              = Java.type("org.objectweb.asm.tree.MethodInsnNode");
+    const FieldInsnNode               = Java.type("org.objectweb.asm.tree.FieldInsnNode");
+    const TypeInsnNode                = Java.type("org.objectweb.asm.tree.TypeInsnNode");
 
     return {
         "ComputerExecutor::createLuaMachine": {
