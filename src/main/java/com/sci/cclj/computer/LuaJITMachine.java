@@ -114,9 +114,9 @@ public final class LuaJITMachine implements ILuaMachine, ILuaContext {
         this.timeout = timeout;
 
         if (!this.initMachine(
-                CCLuaJIT.getCCLJVersion(),
-                CCLuaJIT.getComputerCraftVersion(),
-                CCLuaJIT.getMinecraftVersion(),
+                CCLuaJIT.MOD_VERSION,
+                CCLuaJIT.CCT_VERSION,
+                CCLuaJIT.MC_VERSION,
                 computer.getAPIEnvironment().getComputerEnvironment().getHostString(),
                 ComputerCraft.default_computer_settings,
                 ThreadLocalRandom.current().nextLong())) {
